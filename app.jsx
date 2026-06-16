@@ -44,6 +44,7 @@ const Ic = {
   volume:   (p) => <I {...p} d={<><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></>}/>,
   volumeX:  (p) => <I {...p} d={<><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>}/>,
   maximize: (p) => <I {...p} d={<><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></>}/>,
+  graph:    (p) => <I {...p} d={<><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></>}/>,
 };
 
 // ---------- Tiny toast ----------
@@ -796,6 +797,68 @@ const CASE_TYPE_COLOR = {
   'Corporate Litigation':'#7A5C20',
 };
 
+const RELATIONSHIP_DATA = {
+  nodes: [
+    { id: 'jw',        type: 'person',  role: 'deponent',           label: 'James Whitfield',       sub: 'Deponent · CEO',       initials: 'JW' },
+    { id: 'ph',        type: 'person',  role: 'plaintiff-counsel',  label: 'Patricia Halcinova',    sub: 'Plaintiff Counsel',    initials: 'PH' },
+    { id: 'db',        type: 'person',  role: 'defense-counsel',    label: 'David Brennan',         sub: 'Defense Counsel',      initials: 'DB' },
+    { id: 'sh',        type: 'person',  role: 'party',              label: 'Sarah Hartwell',        sub: 'CEO, Hartwell Grp',    initials: 'SH' },
+    { id: 'mr',        type: 'person',  role: 'associated',         label: 'Marcus Reyes',          sub: 'CFO, WI',              initials: 'MR' },
+    { id: 'dc',        type: 'person',  role: 'associated',         label: 'Daniel Chen',           sub: 'Treasurer, WI',        initials: 'DC' },
+    { id: 'hartwell',  type: 'org',                                  label: 'Hartwell Group',        sub: 'Plaintiff (NY)' },
+    { id: 'whitfield', type: 'org',                                  label: 'Whitfield Industries',  sub: 'Defendant · 2014' },
+    { id: 'hjv',       type: 'org',                                  label: 'Hartwell-Whitfield JV', sub: '2019 — Active' },
+    { id: 'exh-001',   type: 'exhibit',                              label: 'EXHIBIT 1',             sub: 'Employment Contract' },
+    { id: 'exh-002',   type: 'exhibit',                              label: 'EXHIBIT 2',             sub: 'Calendar Records' },
+    { id: 'exh-003',   type: 'exhibit', contradiction: true,         label: 'EXHIBIT 3',             sub: 'Version History' },
+    { id: 'exh-004',   type: 'exhibit', contradiction: true,         label: 'EXHIBIT 4',             sub: 'Email Thread' },
+    { id: 'exh-005',   type: 'exhibit', contradiction: true,         label: 'EXHIBIT 5',             sub: 'Badge Records' },
+    { id: 'wi_h2',     type: 'org',     small: true,                 label: 'WI Holdings II',        sub: 'Subsidiary' },
+    { id: 'cascade',   type: 'org',     small: true,                 label: 'Cascade LLC',           sub: 'Subsidiary' },
+    { id: 'tridelta',  type: 'org',     small: true,                 label: 'Tridelta Partners',     sub: 'Subsidiary' },
+  ],
+  edges: [
+    { source: 'ph',       target: 'hartwell',  label: 'represents',         contradiction: false },
+    { source: 'db',       target: 'jw',        label: 'represents',         contradiction: false },
+    { source: 'hartwell', target: 'hjv',       label: 'party to',           contradiction: false },
+    { source: 'whitfield',target: 'hjv',       label: 'party to',           contradiction: false },
+    { source: 'sh',       target: 'hartwell',  label: 'CEO',                contradiction: false },
+    { source: 'jw',       target: 'whitfield', label: 'CEO of',             contradiction: false },
+    { source: 'mr',       target: 'whitfield', label: 'CFO',                contradiction: false },
+    { source: 'dc',       target: 'whitfield', label: 'Treasurer',          contradiction: false },
+    { source: 'jw',       target: 'exh-001',   label: 'signed',             contradiction: false },
+    { source: 'whitfield',target: 'wi_h2',     label: 'transferred $14.2M', contradiction: false },
+    { source: 'whitfield',target: 'cascade',   label: 'subsidiary',         contradiction: false },
+    { source: 'whitfield',target: 'tridelta',  label: 'subsidiary',         contradiction: false },
+    { source: 'jw',       target: 'exh-003',   label: 'contradicts',        contradiction: true },
+    { source: 'jw',       target: 'exh-004',   label: 'contradicts',        contradiction: true },
+    { source: 'jw',       target: 'exh-005',   label: 'contradicts',        contradiction: true },
+  ],
+};
+
+const EXHIBIT_REFS = {
+  jw: [
+    { ref: 'p.3 l.1 — 0:00:45',   text: '"I was Chief Executive Officer of Whitfield Industries from 2014 to 2022."' },
+    { ref: 'p.14 l.22 — 18:30',   text: '"My role in the joint venture was primarily advisory."' },
+  ],
+  'exh-001': [
+    { ref: 'p.12 l.4 — 14:23',    text: '"I signed the employment contract in March 2018."' },
+    { ref: 'p.47 l.19 — 1:02:15', text: '"The terms were entirely standard for the industry."' },
+  ],
+  'exh-003': [
+    { ref: 'p.31 l.8 — 45:12',    text: '"I did not modify any documents after the fact."' },
+    { ref: 'p.58 l.2 — 1:18:44',  text: '"The version history is irrelevant to this matter."' },
+  ],
+  'exh-004': [
+    { ref: 'p.63 l.11 — 1:24:05', text: '"I never received that email from Hartwell."' },
+    { ref: 'p.71 l.6 — 1:33:22',  text: '"My correspondence with Hartwell was entirely professional."' },
+  ],
+  'exh-005': [
+    { ref: 'p.78 l.3 — 1:41:08',  text: '"I was not in the building on that date."' },
+    { ref: 'p.81 l.15 — 1:44:55', text: '"The badge records must contain an error."' },
+  ],
+};
+
 // ---------- Edit Case Modal ----------
 function EditCaseModal({ c, onClose, onSave }) {
   const [caseName, setCaseName] = useState(c.caseName);
@@ -1067,7 +1130,9 @@ const CASE_WORKFLOWS = [
 ];
 
 function CaseChatPanel({ selectedCase }) {
-  const [messages, setMessages] = useState([]);
+  const [sessions, setSessions] = useState([{ id: 's0', title: 'New chat', messages: [] }]);
+  const [activeId, setActiveId] = useState('s0');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [workingStep, setWorkingStep] = useState(0);
@@ -1079,6 +1144,20 @@ function CaseChatPanel({ selectedCase }) {
 
   const caseDepos = selectedCase ? MOCK_DEPOSITIONS.filter((d) => d.caseNumber === selectedCase.caseNumber) : [];
   const toggleDepo = (id) => setSelectedDepos((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+
+  const active = sessions.find(s => s.id === activeId) || sessions[0];
+  const messages = active ? active.messages : [];
+
+  const patchActive = (updater) =>
+    setSessions(prev => prev.map(s => s.id === activeId ? { ...s, ...updater(s) } : s));
+
+  const newChat = () => {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    setSessions(prev => [{ id, title: 'New chat', messages: [] }, ...prev]);
+    setActiveId(id);
+    setInput('');
+    setHistoryOpen(false);
+  };
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, busy]);
 
@@ -1095,7 +1174,10 @@ function CaseChatPanel({ selectedCase }) {
     if (!q || busy) return;
     setInput('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
-    setMessages((m) => [...m, { role: 'user', text: q }]);
+    patchActive(s => ({
+      title: s.messages.length === 0 ? q.split(' ').slice(0, 6).join(' ') + (q.split(' ').length > 6 ? '…' : '') : s.title,
+      messages: [...s.messages, { role: 'user', text: q }],
+    }));
     setBusy(true);
     const scopeDepos = selectedDepos.length > 0 ? caseDepos.filter((d) => selectedDepos.includes(d.id)) : caseDepos;
     const scopeNames = scopeDepos.map((d) => d.witness).join(', ');
@@ -1103,9 +1185,9 @@ function CaseChatPanel({ selectedCase }) {
       const reply = await window.claude.complete({
         messages: [{ role: 'user', content: `You are an AI legal analyst for the case "${selectedCase?.caseName}" (${selectedCase?.caseNumber}). Scope: depositions from ${scopeNames || 'all witnesses'}. Question: ${q}\n\nRespond in 2-3 sentences, conversational tone. Plain text only.` }],
       });
-      setMessages((m) => [...m, { role: 'ai', text: reply, followUps: ['What evidence supports this?', 'Which witness is most relevant?', 'What follow-up questions should we ask?'] }]);
+      patchActive(s => ({ messages: [...s.messages, { role: 'ai', text: reply, followUps: ['What evidence supports this?', 'Which witness is most relevant?', 'What follow-up questions should we ask?'] }] }));
     } catch {
-      setMessages((m) => [...m, { role: 'ai', text: 'Sorry, I had trouble responding. Try again.', followUps: [] }]);
+      patchActive(s => ({ messages: [...s.messages, { role: 'ai', text: 'Sorry, I had trouble responding. Try again.', followUps: [] }] }));
     }
     setBusy(false);
     inputRef.current?.focus();
@@ -1115,98 +1197,123 @@ function CaseChatPanel({ selectedCase }) {
 
   return (
     <div className="w-[420px] shrink-0 border-l border-[#E2E1DF] flex flex-col bg-[#F8F8F7]">
-      <div className="flex flex-col h-full min-h-0">
-        <div className="flex-1 overflow-y-auto min-h-0">
-          {isEmpty ? (
-            <div className="flex flex-col h-full">
-              <div className="flex-1 flex items-center justify-center">
-                <span className="text-[44px] font-light text-[#D8D5D1] select-none" style={{ fontFamily: "'Source Serif 4', Georgia, serif", letterSpacing: '-0.02em' }}>Cognition</span>
+      {/* Chat header: history + title + new chat */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#E2E1DF] shrink-0">
+        <button onClick={() => setHistoryOpen(o => !o)} title="Chat history"
+          className={cls('w-7 h-7 flex items-center justify-center rounded-lg transition-colors', historyOpen ? 'bg-[#14110D] text-white' : 'text-[#9A8573] hover:bg-[#E8E6E3]')}>
+          <Ic.msg size={13}/>
+        </button>
+        <span className="flex-1 text-[12px] text-[#9A8573] truncate min-w-0">{active?.title || 'New chat'}</span>
+        <button onClick={newChat} title="New chat"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors">
+          <Ic.plus size={14}/>
+        </button>
+      </div>
+
+      {/* History panel */}
+      {historyOpen && (
+        <div className="border-b border-[#E2E1DF] max-h-52 overflow-y-auto shrink-0 bg-[#F8F8F7]">
+          <p className="text-[10px] font-semibold text-[#9A8573] uppercase tracking-wider px-4 pt-3 pb-1.5">Chat history</p>
+          {sessions.map(s => (
+            <button key={s.id} onClick={() => { setActiveId(s.id); setHistoryOpen(false); }}
+              className={cls('w-full text-left px-4 py-2 hover:bg-[#F0F0EE] transition-colors flex items-center gap-2.5', s.id === activeId && 'bg-[#F0F0EE]')}>
+              <Ic.msg size={12} className="text-[#9A8573] shrink-0"/>
+              <span className="text-[12px] text-[#14110D] truncate flex-1">{s.title}</span>
+              {s.messages.length > 0 && <span className="text-[10px] text-[#B5B0AB] shrink-0">{s.messages.filter(m => m.role === 'user').length}q</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {isEmpty ? (
+          <div className="flex flex-col h-full">
+            <div className="flex-1 flex items-center justify-center">
+              <span className="text-[44px] font-light text-[#D8D5D1] select-none" style={{ fontFamily: "'Source Serif 4', Georgia, serif", letterSpacing: '-0.02em' }}>Cognition</span>
+            </div>
+            <div className="px-5 pb-4">
+              <span className="text-[12px] text-[#9A8573]">Suggested</span>
+              <div className="flex flex-col gap-1 mt-3">
+                {CASE_WORKFLOWS.map((w) => (
+                  <button key={w.title} onClick={() => send(w.title)}
+                    className="flex items-start gap-3 px-3.5 py-3 rounded-xl hover:bg-[#F0F0EE] transition-colors text-left">
+                    <span className="text-[#9A8573] mt-0.5 shrink-0">{w.icon}</span>
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#14110D] leading-snug">{w.title}</p>
+                      <p className="text-[12px] text-[#9A8573] mt-0.5 leading-snug">{w.desc}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
-              <div className="px-5 pb-4">
-                <span className="text-[12px] text-[#9A8573]">Suggested</span>
-                <div className="flex flex-col gap-1 mt-3">
-                  {CASE_WORKFLOWS.map((w) => (
-                    <button key={w.title} onClick={() => send(w.title)}
-                      className="flex items-start gap-3 px-3.5 py-3 rounded-xl hover:bg-[#F0F0EE] transition-colors text-left">
-                      <span className="text-[#9A8573] mt-0.5 shrink-0">{w.icon}</span>
-                      <div>
-                        <p className="text-[13px] font-semibold text-[#14110D] leading-snug">{w.title}</p>
-                        <p className="text-[12px] text-[#9A8573] mt-0.5 leading-snug">{w.desc}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="px-5 pt-5 pb-2">
+            {messages.map((m, i) => (
+              m.role === 'user'
+                ? <p key={i} className="text-[13px] text-[#9A8573] mb-3 leading-snug">{m.text}</p>
+                : <AiMessage key={i} msg={m} onFollowUp={send}/>
+            ))}
+            {busy && <WorkingState steps={WORKING_STEPS} currentStep={workingStep} expanded={workingExpanded} onToggle={() => setWorkingExpanded((v) => !v)}/>}
+            <div ref={scrollRef}/>
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <div className="px-4 pb-4 pt-2 shrink-0">
+        {selectedDepos.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {caseDepos.filter((d) => selectedDepos.includes(d.id)).map((d) => (
+              <span key={d.id} className="inline-flex items-center gap-1 text-[11px] bg-[#14110D] text-white rounded-full px-2 py-0.5">
+                {d.witness.split(' ')[0]}
+                <button onClick={() => toggleDepo(d.id)} className="hover:text-white/60 transition-colors"><Ic.x size={10}/></button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="bg-white border border-[#E2E1DF] rounded-2xl px-4 pt-4 pb-3 focus-within:border-[#9A8573] transition-all relative">
+          <textarea ref={inputRef} value={input}
+            onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            placeholder="Ask Cognition anything…" rows={2}
+            className="w-full text-[14px] text-[#14110D] placeholder:text-[#B5B0AB] outline-none resize-none bg-transparent leading-5 mb-3"
+            style={{ minHeight: '44px' }}/>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1 relative">
+              <button className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors"><Ic.plus size={15}/></button>
+              <button onClick={() => setFilterOpen((o) => !o)}
+                className={cls('w-7 h-7 flex items-center justify-center rounded-lg transition-colors', filterOpen ? 'bg-[#14110D] text-white' : 'text-[#9A8573] hover:bg-[#E8E6E3]')}>
+                <Ic.filter size={13}/>
+              </button>
+              {filterOpen && (
+                <div className="absolute bottom-9 left-0 w-56 bg-white border border-[#E2E1DF] rounded-xl shadow-lg py-1.5 z-50" onMouseLeave={() => setFilterOpen(false)}>
+                  <p className="text-[10px] font-semibold text-[#9A8573] uppercase tracking-wider px-3 py-1.5">Filter by deposition</p>
+                  {caseDepos.map((d) => (
+                    <button key={d.id} onClick={() => toggleDepo(d.id)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[#F0F0EE] transition-colors text-left">
+                      <div className={cls('w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors', selectedDepos.includes(d.id) ? 'bg-[#14110D] border-[#14110D]' : 'border-[#C4B5A2]')}>
+                        {selectedDepos.includes(d.id) && <Ic.check size={10} className="text-white"/>}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-medium text-[#14110D] truncate">{d.witness}</p>
+                        <p className="text-[10px] text-[#9A8573]">{d.date}</p>
                       </div>
                     </button>
                   ))}
+                  {selectedDepos.length > 0 && (
+                    <div className="border-t border-[#E2E1DF] mt-1 pt-1 px-3 pb-1">
+                      <button onClick={() => setSelectedDepos([])} className="text-[11px] text-[#9A8573] hover:text-[#14110D] transition-colors">Clear all</button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
-          ) : (
-            <div className="px-5 pt-5 pb-2">
-              {messages.map((m, i) => (
-                m.role === 'user'
-                  ? <p key={i} className="text-[13px] text-[#9A8573] mb-3 leading-snug">{m.text}</p>
-                  : <AiMessage key={i} msg={m} onFollowUp={send}/>
-              ))}
-              {busy && <WorkingState steps={WORKING_STEPS} currentStep={workingStep} expanded={workingExpanded} onToggle={() => setWorkingExpanded((v) => !v)}/>}
-              <div ref={scrollRef}/>
-            </div>
-          )}
-        </div>
-
-        <div className="px-4 pb-4 pt-2 shrink-0">
-          {/* Deposition scope pills */}
-          {selectedDepos.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {caseDepos.filter((d) => selectedDepos.includes(d.id)).map((d) => (
-                <span key={d.id} className="inline-flex items-center gap-1 text-[11px] bg-[#14110D] text-white rounded-full px-2 py-0.5">
-                  {d.witness.split(' ')[0]}
-                  <button onClick={() => toggleDepo(d.id)} className="hover:text-white/60 transition-colors"><Ic.x size={10}/></button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="bg-white border border-[#E2E1DF] rounded-2xl px-4 pt-4 pb-3 focus-within:border-[#9A8573] transition-all relative">
-            <textarea ref={inputRef} value={input}
-              onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder="Ask Cognition anything…" rows={2}
-              className="w-full text-[14px] text-[#14110D] placeholder:text-[#B5B0AB] outline-none resize-none bg-transparent leading-5 mb-3"
-              style={{ minHeight: '44px' }}/>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1 relative">
-                <button className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors"><Ic.plus size={15}/></button>
-                <button
-                  onClick={() => setFilterOpen((o) => !o)}
-                  className={cls('w-7 h-7 flex items-center justify-center rounded-lg transition-colors', filterOpen ? 'bg-[#14110D] text-white' : 'text-[#9A8573] hover:bg-[#E8E6E3]')}>
-                  <Ic.filter size={13}/>
-                </button>
-                {filterOpen && (
-                  <div className="absolute bottom-9 left-0 w-56 bg-white border border-[#E2E1DF] rounded-xl shadow-lg py-1.5 z-50" onMouseLeave={() => setFilterOpen(false)}>
-                    <p className="text-[10px] font-semibold text-[#9A8573] uppercase tracking-wider px-3 py-1.5">Filter by deposition</p>
-                    {caseDepos.map((d) => (
-                      <button key={d.id} onClick={() => toggleDepo(d.id)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[#F0F0EE] transition-colors text-left">
-                        <div className={cls('w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors', selectedDepos.includes(d.id) ? 'bg-[#14110D] border-[#14110D]' : 'border-[#C4B5A2]')}>
-                          {selectedDepos.includes(d.id) && <Ic.check size={10} className="text-white"/>}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-medium text-[#14110D] truncate">{d.witness}</p>
-                          <p className="text-[10px] text-[#9A8573]">{d.date}</p>
-                        </div>
-                      </button>
-                    ))}
-                    {selectedDepos.length > 0 && (
-                      <div className="border-t border-[#E2E1DF] mt-1 pt-1 px-3 pb-1">
-                        <button onClick={() => setSelectedDepos([])} className="text-[11px] text-[#9A8573] hover:text-[#14110D] transition-colors">Clear all</button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              <button onClick={() => send()} disabled={busy || !input.trim()}
-                className="w-7 h-7 rounded-lg bg-[#14110D] text-white flex items-center justify-center hover:bg-[#2C2316] disabled:opacity-25 disabled:cursor-not-allowed transition-all">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-              </button>
-            </div>
+            <button onClick={() => send()} disabled={busy || !input.trim()}
+              className="w-7 h-7 rounded-lg bg-[#14110D] text-white flex items-center justify-center hover:bg-[#2C2316] disabled:opacity-25 disabled:cursor-not-allowed transition-all">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -2125,12 +2232,13 @@ function AiMessage({ msg, onFollowUp }) {
 }
 
 function ChatTab({ depo }) {
-  const [messages, setMessages] = useState([]);
+  const [sessions, setSessions] = useState([{ id: 's0', title: 'New chat', messages: [] }]);
+  const [activeId, setActiveId] = useState('s0');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [workingStep, setWorkingStep] = useState(0);
   const [workingExpanded, setWorkingExpanded] = useState(true);
-
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -2139,9 +2247,21 @@ function ChatTab({ depo }) {
   const goalsTotal = MOCK_DETAIL.goals.length;
   const goalsDone  = MOCK_DETAIL.goals.filter((g) => g.covered).length;
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, busy, workingStep]);
+  const active = sessions.find(s => s.id === activeId) || sessions[0];
+  const messages = active ? active.messages : [];
+
+  const patchActive = (updater) =>
+    setSessions(prev => prev.map(s => s.id === activeId ? { ...s, ...updater(s) } : s));
+
+  const newChat = () => {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    setSessions(prev => [{ id, title: 'New chat', messages: [] }, ...prev]);
+    setActiveId(id);
+    setInput('');
+    setHistoryOpen(false);
+  };
+
+  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, busy, workingStep]);
 
   useEffect(() => {
     if (!busy) return;
@@ -2161,23 +2281,22 @@ function ChatTab({ depo }) {
     if (!q || busy) return;
     setInput('');
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
-    setMessages((m) => [...m, { role: 'user', text: q }]);
+    patchActive(s => ({
+      title: s.messages.length === 0 ? q.split(' ').slice(0, 6).join(' ') + (q.split(' ').length > 6 ? '…' : '') : s.title,
+      messages: [...s.messages, { role: 'user', text: q }],
+    }));
     setBusy(true);
     try {
       const reply = await window.claude.complete({
         messages: [{
           role: 'user',
-          content: `You are an AI legal analyst reviewing a deposition of ${depo.witness}. Context: ${MOCK_DETAIL.summary} There are ${flagCount} flagged items (${highFlags} high severity). Goals: ${goalsDone}/${goalsTotal} covered. Question: ${q}\n\nRespond in 2-3 sentences, conversational tone. Be specific. End your JSON response as plain text only, no JSON.`,
+          content: `You are an AI legal analyst reviewing a deposition of ${depo.witness}. Context: ${MOCK_DETAIL.summary} There are ${flagCount} flagged items (${highFlags} high severity). Goals: ${goalsDone}/${goalsTotal} covered. Question: ${q}\n\nRespond in 2-3 sentences, conversational tone. Be specific. Plain text only, no JSON.`,
         }],
       });
-      const followUps = [
-        `What evidence supports this from the transcript?`,
-        `How does this relate to the primary case theory?`,
-        `What follow-up questions should we ask?`,
-      ];
-      setMessages((m) => [...m, { role: 'ai', text: reply, followUps }]);
+      const followUps = ['What evidence supports this from the transcript?', 'How does this relate to the primary case theory?', 'What follow-up questions should we ask?'];
+      patchActive(s => ({ messages: [...s.messages, { role: 'ai', text: reply, followUps }] }));
     } catch {
-      setMessages((m) => [...m, { role: 'ai', text: 'Sorry, I had trouble responding. Try again.', followUps: [] }]);
+      patchActive(s => ({ messages: [...s.messages, { role: 'ai', text: 'Sorry, I had trouble responding. Try again.', followUps: [] }] }));
     }
     setBusy(false);
     inputRef.current?.focus();
@@ -2187,6 +2306,35 @@ function ChatTab({ depo }) {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#F8F8F7]">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-[#E2E1DF] shrink-0">
+        <button onClick={() => setHistoryOpen(o => !o)} title="Chat history"
+          className={cls('w-7 h-7 flex items-center justify-center rounded-lg transition-colors', historyOpen ? 'bg-[#14110D] text-white' : 'text-[#9A8573] hover:bg-[#E8E6E3]')}>
+          <Ic.msg size={13}/>
+        </button>
+        <span className="flex-1 text-[11px] text-[#9A8573] truncate min-w-0">{active?.title || 'New chat'}</span>
+        <button onClick={newChat} title="New chat"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors">
+          <Ic.plus size={14}/>
+        </button>
+      </div>
+
+      {/* History panel */}
+      {historyOpen && (
+        <div className="border-b border-[#E2E1DF] max-h-48 overflow-y-auto shrink-0">
+          <p className="text-[10px] font-semibold text-[#9A8573] uppercase tracking-wider px-4 pt-3 pb-1.5">Chat history</p>
+          {sessions.map(s => (
+            <button key={s.id} onClick={() => { setActiveId(s.id); setHistoryOpen(false); }}
+              className={cls('w-full text-left px-4 py-2 hover:bg-[#F0F0EE] transition-colors flex items-center gap-2.5', s.id === activeId && 'bg-[#F0F0EE]')}>
+              <Ic.msg size={12} className="text-[#9A8573] shrink-0"/>
+              <span className="text-[12px] text-[#14110D] truncate flex-1">{s.title}</span>
+              {s.messages.length > 0 && <span className="text-[10px] text-[#B5B0AB] shrink-0">{s.messages.filter(m => m.role === 'user').length}q</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {isEmpty ? (
           <div className="flex flex-col h-full">
@@ -2218,39 +2366,25 @@ function ChatTab({ depo }) {
                 ? <p key={i} className="text-[13px] text-[#9A8573] mb-3 leading-snug">{m.text}</p>
                 : <AiMessage key={i} msg={m} onFollowUp={send}/>
             ))}
-            {busy && (
-              <WorkingState
-                steps={WORKING_STEPS}
-                currentStep={workingStep}
-                expanded={workingExpanded}
-                onToggle={() => setWorkingExpanded((v) => !v)}
-              />
-            )}
+            {busy && <WorkingState steps={WORKING_STEPS} currentStep={workingStep} expanded={workingExpanded} onToggle={() => setWorkingExpanded((v) => !v)}/>}
             <div ref={scrollRef}/>
           </div>
         )}
       </div>
 
+      {/* Input */}
       <div className="px-4 pb-4 pt-2 shrink-0">
         <div className="bg-white border border-[#E2E1DF] rounded-2xl px-4 pt-4 pb-3 focus-within:border-[#9A8573] transition-all">
-          <textarea
-            ref={inputRef}
-            value={input}
+          <textarea ref={inputRef} value={input}
             onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder="Ask Cognition anything…"
-            rows={2}
+            placeholder="Ask Cognition anything…" rows={2}
             className="w-full text-[14px] text-[#14110D] placeholder:text-[#B5B0AB] outline-none resize-none bg-transparent leading-5 mb-3"
-            style={{ minHeight: '44px' }}
-          />
+            style={{ minHeight: '44px' }}/>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
-              <button className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors">
-                <Ic.plus size={15}/>
-              </button>
-              <button className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors">
-                <Ic.filter size={13}/>
-              </button>
+              <button className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors"><Ic.plus size={15}/></button>
+              <button className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors"><Ic.filter size={13}/></button>
             </div>
             <button onClick={() => send()} disabled={busy || !input.trim()}
               className="w-7 h-7 rounded-lg bg-[#14110D] text-white flex items-center justify-center hover:bg-[#2C2316] disabled:opacity-25 disabled:cursor-not-allowed transition-all">
@@ -2259,6 +2393,171 @@ function ChatTab({ depo }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------- Relationship Map ----------
+function RelationshipMap() {
+  const svgRef = useRef(null);
+  const simRef = useRef(null);
+  const [selectedNode, setSelectedNode] = useState(null);
+
+  useEffect(() => {
+    const d3 = window.d3;
+    if (!d3) return;
+    let rafId;
+    const init = () => {
+      const svgEl = svgRef.current;
+      if (!svgEl) return;
+      const W = svgEl.clientWidth || 640;
+      const H = svgEl.clientHeight || 480;
+      const nodes = RELATIONSHIP_DATA.nodes.map(n => ({ ...n }));
+      const links = RELATIONSHIP_DATA.edges.map(e => ({ ...e }));
+
+      d3.select(svgEl).selectAll('*').remove();
+      const svg = d3.select(svgEl).attr('width', W).attr('height', H);
+
+      const zoomH = d3.zoom().scaleExtent([0.25, 4])
+        .on('zoom', (ev) => g.attr('transform', ev.transform));
+      svg.call(zoomH);
+      svg.on('click', () => setSelectedNode(null));
+
+      const g = svg.append('g');
+
+      const sim = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(115))
+        .force('charge', d3.forceManyBody().strength(-400))
+        .force('center', d3.forceCenter(W / 2, H / 2))
+        .force('collision', d3.forceCollide().radius(54));
+      simRef.current = sim;
+
+      const link = g.append('g').selectAll('line').data(links).join('line')
+        .attr('stroke', d => d.contradiction ? '#DC2626' : '#C4B5A2')
+        .attr('stroke-width', d => d.contradiction ? 1.5 : 1)
+        .attr('stroke-dasharray', d => d.contradiction ? '5,4' : null)
+        .attr('opacity', d => d.contradiction ? 0.8 : 0.5);
+
+      const linkLabel = g.append('g').selectAll('text').data(links).join('text')
+        .attr('font-size', 7).attr('fill', d => d.contradiction ? '#DC2626' : '#B5B0AB')
+        .attr('text-anchor', 'middle').attr('font-family', 'Inter, sans-serif')
+        .text(d => d.label);
+
+      const nodeG = g.append('g').selectAll('g').data(nodes).join('g')
+        .attr('cursor', 'pointer')
+        .on('click', (ev, d) => { ev.stopPropagation(); setSelectedNode({ ...d }); })
+        .call(d3.drag()
+          .on('start', (ev, d) => { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+          .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+          .on('end',   (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+        );
+
+      nodeG.each(function(d) {
+        const sel = d3.select(this);
+        if (d.type === 'exhibit') {
+          const s = 20;
+          sel.append('rect').attr('width', s*2).attr('height', s*2).attr('x', -s).attr('y', -s).attr('rx', 3)
+            .attr('transform', 'rotate(45)')
+            .attr('fill', d.contradiction ? '#FEF2F2' : '#EEE9E2')
+            .attr('stroke', d.contradiction ? '#DC2626' : '#C4B5A2')
+            .attr('stroke-width', d.contradiction ? 1.5 : 1)
+            .attr('stroke-dasharray', d.contradiction ? '4,3' : null);
+        } else if (d.type === 'org') {
+          const [w, h] = d.small ? [68, 24] : [86, 28];
+          sel.append('rect').attr('width', w).attr('height', h).attr('x', -w/2).attr('y', -h/2).attr('rx', 6)
+            .attr('fill', '#EEE9E2').attr('stroke', '#C4B5A2').attr('stroke-width', 1);
+        } else {
+          const r = d.role === 'deponent' ? 26 : 20;
+          const fills = { deponent: '#14110D', 'plaintiff-counsel': '#7A2E20', 'defense-counsel': '#1D4E89', party: '#3D6B2E', associated: '#EEE9E2' };
+          sel.append('circle').attr('r', r).attr('fill', fills[d.role] || '#EEE9E2').attr('stroke', '#C4B5A2').attr('stroke-width', 1);
+          if (d.initials) {
+            sel.append('text').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+              .attr('font-size', d.role === 'deponent' ? 10 : 8).attr('font-weight', '600')
+              .attr('font-family', 'Inter, sans-serif')
+              .attr('fill', ['deponent','plaintiff-counsel','defense-counsel','party'].includes(d.role) ? 'white' : '#14110D')
+              .text(d.initials);
+          }
+        }
+        const yLabel = d.type === 'exhibit' ? 37 : d.type === 'org' ? (d.small ? 19 : 22) : (d.role === 'deponent' ? 35 : 29);
+        sel.append('text').attr('text-anchor', 'middle').attr('y', yLabel)
+          .attr('font-size', d.small ? 8 : 9).attr('fill', '#14110D')
+          .attr('font-family', 'Inter, sans-serif').attr('font-weight', '500').text(d.label);
+        sel.append('text').attr('text-anchor', 'middle').attr('y', yLabel + 11)
+          .attr('font-size', 8).attr('fill', d.contradiction ? '#DC2626' : '#9A8573')
+          .attr('font-family', 'Inter, sans-serif').text(d.sub || '');
+      });
+
+      sim.on('tick', () => {
+        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+        linkLabel.attr('x', d => (d.source.x + d.target.x) / 2)
+                 .attr('y', d => (d.source.y + d.target.y) / 2 - 5);
+        nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+      });
+    };
+    rafId = requestAnimationFrame(init);
+    return () => { cancelAnimationFrame(rafId); simRef.current?.stop(); };
+  }, []);
+
+  return (
+    <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <svg ref={svgRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'block' }}/>
+        {/* Legend */}
+        <div style={{ position: 'absolute', bottom: 12, left: 12 }}
+          className="bg-white/90 border border-[#E2E1DF] rounded-lg px-3 py-2 text-[10px] text-[#6B5744] space-y-1.5">
+          <div className="flex items-center gap-1.5"><span style={{ width: 14, borderTop: '1px solid #C4B5A2', display: 'block' }}/><span>Relationship</span></div>
+          <div className="flex items-center gap-1.5"><span style={{ width: 14, borderTop: '2px dashed #DC2626', display: 'block' }}/><span className="text-rose-600 font-medium">Contradicts</span></div>
+          <div className="flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: '50%', background: '#14110D', display: 'inline-block' }}/><span>Deponent</span></div>
+          <div className="flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: '50%', background: '#7A2E20', display: 'inline-block' }}/><span>Plaintiff Counsel</span></div>
+          <div className="flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: '50%', background: '#1D4E89', display: 'inline-block' }}/><span>Defense Counsel</span></div>
+          <div className="flex items-center gap-1.5"><span style={{ width: 14, height: 9, borderRadius: 3, background: '#EEE9E2', border: '1px solid #C4B5A2', display: 'inline-block' }}/><span>Organization</span></div>
+        </div>
+        <div style={{ position: 'absolute', top: 10, right: 10 }}
+          className="text-[10px] text-[#9A8573] bg-white/80 rounded-md px-2 py-1 border border-[#E2E1DF]">
+          Drag · Scroll to zoom · Click node
+        </div>
+      </div>
+      {selectedNode && (
+        <div style={{ width: 228, flexShrink: 0 }} className="border-l border-[#E2E1DF] overflow-y-auto bg-[#F8F8F7]">
+          <div className="flex items-center justify-between px-4 pt-3.5 pb-1">
+            <span className="text-[13px] font-semibold text-[#14110D]">{selectedNode.label}</span>
+            <button onClick={() => setSelectedNode(null)} className="w-6 h-6 flex items-center justify-center rounded text-[#9A8573] hover:bg-[#E9E8E7] transition-colors"><Ic.x size={11}/></button>
+          </div>
+          {selectedNode.sub && <p className="text-[11px] text-[#9A8573] px-4 pb-2">{selectedNode.sub}</p>}
+          <div className="px-4 pb-3 border-t border-[#E2E1DF] pt-3">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-[#9A8573] mb-2">Connections</p>
+            <div className="flex flex-col gap-1.5">
+              {RELATIONSHIP_DATA.edges
+                .filter(e => e.source === selectedNode.id || e.target === selectedNode.id)
+                .map((e, i) => {
+                  const otherId = e.source === selectedNode.id ? e.target : e.source;
+                  const other = RELATIONSHIP_DATA.nodes.find(n => n.id === otherId);
+                  return (
+                    <div key={i} className={cls('text-[11px] rounded-md px-2.5 py-1.5 flex items-center gap-1.5', e.contradiction ? 'bg-rose-50 text-rose-700' : 'bg-[#F0EDE8] text-[#4A3828]')}>
+                      <span className="font-medium shrink-0">{e.label}</span>
+                      <Ic.chevR size={9} className="shrink-0 opacity-40"/>
+                      <span className="truncate">{other?.label || otherId}</span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+          {EXHIBIT_REFS[selectedNode.id] && (
+            <div className="px-4 pb-4 border-t border-[#E2E1DF] pt-3">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[#9A8573] mb-2">Transcript Citations</p>
+              <div className="flex flex-col gap-2">
+                {EXHIBIT_REFS[selectedNode.id].map((r, i) => (
+                  <div key={i} className="bg-white border border-[#E2E1DF] rounded-lg px-3 py-2">
+                    <p className="font-mono text-[9px] text-[#9A8573] mb-1">{r.ref}</p>
+                    <p className="text-[11px] text-[#4A3828] leading-relaxed italic">{r.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2438,12 +2737,13 @@ function DepositionDetail({ id, onBack }) {
   const jump = (t) => { setCurrentTime(t); setPlaying(true); };
 
   const tabs = [
-    { id: 'chat',           label: 'AI Chat',        short: 'Chat',      icon: Ic.sparkles },
-    { id: 'contradictions', label: 'Contradictions', short: 'Issues',    icon: Ic.alert,    count: MOCK_DETAIL.contradictions?.length },
-    { id: 'flagged',        label: 'Flagged',         short: 'Flagged',   icon: Ic.flag,     count: MOCK_DETAIL.flaggedItems.filter((f) => f.severity === 'high').length },
-    { id: 'sentiment',      label: 'Sentiment',       short: 'Sentiment', icon: Ic.scale },
-    { id: 'exhibits',       label: 'Exhibits',        short: 'Exhibits',  icon: Ic.fileText },
-    { id: 'timeline',       label: 'Timeline',        short: 'Timeline',  icon: Ic.calendar },
+    { id: 'chat',           label: 'AI Chat',           short: 'Chat',      icon: Ic.sparkles },
+    { id: 'contradictions', label: 'Contradictions',    short: 'Issues',    icon: Ic.alert,    count: MOCK_DETAIL.contradictions?.length },
+    { id: 'flagged',        label: 'Flagged',            short: 'Flagged',   icon: Ic.flag,     count: MOCK_DETAIL.flaggedItems.filter((f) => f.severity === 'high').length },
+    { id: 'sentiment',      label: 'Sentiment',          short: 'Sentiment', icon: Ic.scale },
+    { id: 'exhibits',       label: 'Exhibits',           short: 'Exhibits',  icon: Ic.fileText },
+    { id: 'timeline',       label: 'Timeline',           short: 'Timeline',  icon: Ic.calendar },
+    { id: 'map',            label: 'Relationship Map',   short: 'Map',       icon: Ic.graph },
   ];
 
   const exportOptions = [
@@ -2607,7 +2907,7 @@ function DepositionDetail({ id, onBack }) {
 
         {/* RIGHT FLYOUT: tab content */}
         {flyoutOpen && (
-          <div style={{ flex: '0 0 32%', minWidth: 0 }} className="border-l border-[#E2E1DF] flex flex-col bg-[#F8F8F7] overflow-hidden">
+          <div style={{ flex: tab === 'map' ? '0 0 50%' : '0 0 32%', minWidth: 0 }} className="border-l border-[#E2E1DF] flex flex-col bg-[#F8F8F7] overflow-hidden">
             <div className="flex items-center justify-between px-5 border-b border-[#E2E1DF] shrink-0 bg-[#F8F8F7]" style={{ minHeight: '44px' }}>
               <span className="text-[13px] font-semibold text-[#14110D]">
                 {tabs.find(t => t.id === tab)?.label}
@@ -2616,13 +2916,14 @@ function DepositionDetail({ id, onBack }) {
                 <Ic.x size={13}/>
               </button>
             </div>
-            <div className={cls('flex-1 min-h-0 overflow-y-auto', tab === 'chat' && 'overflow-hidden flex flex-col')}>
+            <div className={cls('flex-1 min-h-0', (tab === 'chat' || tab === 'map') ? 'overflow-hidden flex flex-col' : 'overflow-y-auto')}>
               {tab === 'chat'           && <ChatTab depo={depo}/>}
               {tab === 'flagged'        && <FlaggedTab items={MOCK_DETAIL.flaggedItems} jump={jump}/>}
               {tab === 'contradictions' && <ContradictionsTab jump={jump}/>}
               {tab === 'exhibits'       && <div className="px-4 py-3"><ExhibitsTab jump={jump}/></div>}
               {tab === 'sentiment'      && <div className="px-4 py-3"><SentimentTab data={MOCK_DETAIL.sentiment}/></div>}
               {tab === 'timeline'       && <ErrorBoundary><TimelineTab events={MOCK_DETAIL.timeline} jump={jump}/></ErrorBoundary>}
+              {tab === 'map'            && <RelationshipMap/>}
             </div>
           </div>
         )}
