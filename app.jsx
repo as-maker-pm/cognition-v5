@@ -89,6 +89,23 @@ function AuthProvider({ children }) {
 }
 const useAuth = () => useContext(AuthCtx);
 
+// ---------- Verify Context ----------
+const VerifyCtx = createContext(null);
+function VerifyProvider({ children }) {
+  const [records, setRecords] = useState({});
+  const doVerify = (id, byName) => setRecords(r => ({
+    ...r, [id]: { ...(r[id] || { fixes:[] }), verified:true, by:byName, at:new Date().toISOString() }
+  }));
+  const doFix = (id, original, fixed, note, byName) => setRecords(r => {
+    const prev = r[id] || { fixes:[] };
+    return { ...r, [id]: { ...prev, verified:true, by:byName, at:new Date().toISOString(),
+      fixes:[...(prev.fixes||[]), { original, fixed, note, by:byName, at:new Date().toISOString() }] }};
+  });
+  const getRecord = (id) => records[id] || null;
+  return <VerifyCtx.Provider value={{ doVerify, doFix, getRecord }}>{children}</VerifyCtx.Provider>;
+}
+const useVerifyCtx = () => useContext(VerifyCtx);
+
 // ---------- UI primitives ----------
 const cls = (...a) => a.filter(Boolean).join(' ');
 
@@ -125,6 +142,128 @@ const Badge = ({ variant = 'secondary', className = '', children }) => {
 const Card = ({ className = '', children, ...rest }) => (
   <div className={cls('rounded-lg border border-slate-100 bg-white', className)} {...rest}>{children}</div>
 );
+
+// ---------- Verify Chip ----------
+function VerifyChip({ id, content }) {
+  const { doVerify, doFix, getRecord } = useVerifyCtx();
+  const { user } = useAuth();
+  const record = getRecord(id);
+  const [fixOpen, setFixOpen] = useState(false);
+  const [fixText, setFixText] = useState('');
+  const [fixNote, setFixNote] = useState('');
+  const [tipVisible, setTipVisible] = useState(false);
+
+  const fmt = (iso) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) +
+        ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    } catch { return ''; }
+  };
+
+  const latestFix = record?.fixes?.slice(-1)[0];
+
+  if (record?.verified) {
+    return (
+      <span style={{ position:'relative', display:'inline-flex', alignItems:'center', verticalAlign:'middle' }}
+        onMouseEnter={() => setTipVisible(true)} onMouseLeave={() => setTipVisible(false)}>
+        <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:10, fontWeight:600,
+          padding:'2px 7px', borderRadius:99, cursor:'default', userSelect:'none', whiteSpace:'nowrap',
+          background: latestFix ? '#EFF6FF' : '#F0FDF4',
+          border: `1px solid ${latestFix ? '#BFDBFE' : '#BBF7D0'}`,
+          color: latestFix ? '#1D4E89' : '#3D6B2E' }}>
+          <Ic.checkC size={9}/>
+          {latestFix ? 'Fixed' : 'Verified'}
+        </span>
+        {tipVisible && (
+          <div style={{ position:'absolute', bottom:'calc(100% + 7px)', left:0, zIndex:60,
+            background:'#1C1917', borderRadius:9, padding:'9px 13px', fontSize:11, color:'#E7E5E4',
+            lineHeight:1.6, minWidth:190, boxShadow:'0 8px 28px rgba(0,0,0,0.38)',
+            pointerEvents:'none', whiteSpace:'nowrap' }}>
+            {latestFix ? (
+              <>
+                <p style={{ fontWeight:700, color:'#FFF', marginBottom:2 }}>Fixed &amp; Verified</p>
+                <p style={{ color:'#A8A29E' }}>by {latestFix.by}</p>
+                <p style={{ color:'#78716C', fontSize:10 }}>{fmt(latestFix.at)}</p>
+                {latestFix.note && (
+                  <p style={{ color:'#D6D3D1', marginTop:6, fontStyle:'italic', whiteSpace:'normal',
+                    maxWidth:240, borderTop:'1px solid #3C3836', paddingTop:6 }}>"{latestFix.note}"</p>
+                )}
+                {record.fixes.length > 1 && (
+                  <p style={{ color:'#57534E', marginTop:4, fontSize:10 }}>{record.fixes.length} revisions</p>
+                )}
+              </>
+            ) : (
+              <>
+                <p style={{ fontWeight:700, color:'#FFF', marginBottom:2 }}>Verified</p>
+                <p style={{ color:'#A8A29E' }}>by {record.by}</p>
+                <p style={{ color:'#78716C', fontSize:10 }}>{fmt(record.at)}</p>
+              </>
+            )}
+          </div>
+        )}
+      </span>
+    );
+  }
+
+  const byName = user?.name || user?.email || 'Team member';
+  return (
+    <span>
+      <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
+        <button onClick={() => doVerify(id, byName)}
+          style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:10, fontWeight:500,
+            padding:'2px 7px', borderRadius:99, border:'1px solid #D0CAC3', background:'transparent',
+            color:'#9A8573', cursor:'pointer', transition:'all 0.12s' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor='#BBF7D0'; e.currentTarget.style.color='#3D6B2E'; e.currentTarget.style.background='#F0FDF4'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor='#D0CAC3'; e.currentTarget.style.color='#9A8573'; e.currentTarget.style.background='transparent'; }}>
+          <Ic.checkC size={9}/>Verify
+        </button>
+        <button onClick={() => { setFixOpen(v => !v); if (!fixOpen) setFixText(content); }}
+          style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:10, fontWeight:500,
+            padding:'2px 7px', borderRadius:99, border:'1px solid #D0CAC3', background:'transparent',
+            color:'#9A8573', cursor:'pointer', transition:'all 0.12s' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor='#FECACA'; e.currentTarget.style.color='#7A2E20'; e.currentTarget.style.background='#FFF5F5'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor='#D0CAC3'; e.currentTarget.style.color='#9A8573'; e.currentTarget.style.background='transparent'; }}>
+          <Ic.edit size={9}/>Fix
+        </button>
+      </span>
+      {fixOpen && (
+        <div style={{ marginTop:8, borderRadius:8, border:'1px solid #E2E1DF', background:'#FAFAF9',
+          padding:'10px 12px', display:'block' }}>
+          <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.09em',
+            color:'#9A8573', marginBottom:6 }}>Correction</p>
+          <textarea value={fixText} onChange={e => setFixText(e.target.value)} rows={3}
+            style={{ width:'100%', borderRadius:6, border:'1px solid #D0CAC3', background:'#FFF',
+              padding:'6px 8px', fontSize:11, color:'#14110D', resize:'vertical', outline:'none',
+              fontFamily:'inherit', boxSizing:'border-box', display:'block' }}
+            onFocus={e => e.target.style.borderColor='#14110D'}
+            onBlur={e => e.target.style.borderColor='#D0CAC3'}/>
+          <input placeholder="Note on this fix (optional)" value={fixNote} onChange={e => setFixNote(e.target.value)}
+            style={{ width:'100%', marginTop:6, borderRadius:6, border:'1px solid #D0CAC3', background:'#FFF',
+              padding:'5px 8px', fontSize:11, color:'#14110D', outline:'none',
+              fontFamily:'inherit', boxSizing:'border-box', display:'block' }}
+            onFocus={e => e.target.style.borderColor='#14110D'}
+            onBlur={e => e.target.style.borderColor='#D0CAC3'}/>
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:6, marginTop:8 }}>
+            <button onClick={() => { setFixOpen(false); setFixText(''); setFixNote(''); }}
+              style={{ padding:'4px 10px', borderRadius:6, border:'1px solid #D0CAC3',
+                background:'transparent', fontSize:11, color:'#6B5744', cursor:'pointer' }}>
+              Cancel
+            </button>
+            <button
+              onClick={() => { doFix(id, content, fixText, fixNote, byName); setFixOpen(false); setFixNote(''); }}
+              disabled={!fixText.trim() || fixText.trim() === (content||'').trim()}
+              style={{ padding:'4px 10px', borderRadius:6, border:'none', background:'#14110D',
+                color:'#FFF', fontSize:11, fontWeight:500, cursor:'pointer',
+                opacity: (!fixText.trim() || fixText.trim() === (content||'').trim()) ? 0.38 : 1 }}>
+              Apply Fix
+            </button>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
 
 // ---------- Three-Dot Menu ----------
 function ThreeDotMenu({ items, className = '' }) {
@@ -1185,9 +1324,9 @@ function CaseChatPanel({ selectedCase }) {
       const reply = await window.claude.complete({
         messages: [{ role: 'user', content: `You are an AI legal analyst for the case "${selectedCase?.caseName}" (${selectedCase?.caseNumber}). Scope: depositions from ${scopeNames || 'all witnesses'}. Question: ${q}\n\nRespond in 2-3 sentences, conversational tone. Plain text only.` }],
       });
-      patchActive(s => ({ messages: [...s.messages, { role: 'ai', text: reply, followUps: ['What evidence supports this?', 'Which witness is most relevant?', 'What follow-up questions should we ask?'] }] }));
+      patchActive(s => ({ messages: [...s.messages, { role: 'ai', id: Date.now().toString(36) + Math.random().toString(36).slice(2), text: reply, followUps: ['What evidence supports this?', 'Which witness is most relevant?', 'What follow-up questions should we ask?'] }] }));
     } catch {
-      patchActive(s => ({ messages: [...s.messages, { role: 'ai', text: 'Sorry, I had trouble responding. Try again.', followUps: [] }] }));
+      patchActive(s => ({ messages: [...s.messages, { role: 'ai', id: Date.now().toString(36), text: 'Sorry, I had trouble responding. Try again.', followUps: [] }] }));
     }
     setBusy(false);
     inputRef.current?.focus();
@@ -1253,7 +1392,7 @@ function CaseChatPanel({ selectedCase }) {
             {messages.map((m, i) => (
               m.role === 'user'
                 ? <p key={i} className="text-[13px] text-[#9A8573] mb-3 leading-snug">{m.text}</p>
-                : <AiMessage key={i} msg={m} onFollowUp={send}/>
+                : <AiMessage key={i} msg={m} onFollowUp={send} msgIdx={i}/>
             ))}
             {busy && <WorkingState steps={WORKING_STEPS} currentStep={workingStep} expanded={workingExpanded} onToggle={() => setWorkingExpanded((v) => !v)}/>}
             <div ref={scrollRef}/>
@@ -1803,6 +1942,7 @@ const FLAG_TYPE_CONFIG = {
 
 function FlaggedTab({ items, jump }) {
   const [collapsed, setCollapsed] = useState({});
+  const { getRecord } = useVerifyCtx();
   const fmt = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 
   const groups = [
@@ -1830,30 +1970,69 @@ function FlaggedTab({ items, jump }) {
               <div className="px-4 py-2.5 flex flex-col gap-1.5 bg-[#F8F8F7]">
                 {groupItems.map((f) => {
                   const cfg = FLAG_TYPE_CONFIG[f.type] || { color: '#9CA3AF', bg: '#F9FAFB' };
+                  const vid = `flag-${f.id}`;
+                  const rec = getRecord(vid);
+                  const displayDesc = rec?.fixes?.slice(-1)[0]?.fixed || f.description;
                   return (
-                    <button key={f.id} onClick={() => jump(f.timestamp)}
-                      className="w-full text-left rounded-lg bg-white overflow-hidden hover:bg-[#F0F0EE] transition-colors"
+                    <div key={f.id}
+                      className="w-full text-left rounded-lg bg-white overflow-hidden"
                       style={{ border: `1px solid ${cfg.color}22` }}>
                       <div className="flex items-stretch">
-                        {/* Colored left strip */}
                         <div className="w-1 shrink-0 rounded-l-lg" style={{ background: cfg.color }}/>
                         <div className="flex-1 px-3 py-2.5">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: cfg.bg, color: cfg.color }}>
-                                {f.type.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                              </span>
+                          <div onClick={() => jump(f.timestamp)} className="cursor-pointer hover:opacity-80 transition-opacity">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: cfg.bg, color: cfg.color }}>
+                                  {f.type.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                </span>
+                              </div>
+                              <span className="inline-flex items-center text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5 shrink-0 whitespace-nowrap">{fmt(f.timestamp)}</span>
                             </div>
-                            <span className="inline-flex items-center text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5 shrink-0 whitespace-nowrap">{fmt(f.timestamp)}</span>
+                            <div className="text-[12px] text-[#374151] leading-relaxed mb-1.5">{displayDesc}</div>
                           </div>
-                          <div className="text-[12px] text-[#374151] leading-relaxed">{f.description}</div>
+                          <VerifyChip id={vid} content={f.description}/>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
             )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SentimentMoments({ labeled, sentColor, sentBg, sentLabel, fmt }) {
+  const { getRecord } = useVerifyCtx();
+  return (
+    <div className="flex flex-col gap-2">
+      {labeled.map((d, i) => {
+        const vid = `sentiment-moment-${i}`;
+        const rec = getRecord(vid);
+        const displayNote = rec?.fixes?.slice(-1)[0]?.fixed || d.note || '';
+        return (
+          <div key={i}
+            className="w-full text-left bg-white rounded-xl border border-[#E2E1DF] overflow-hidden flex">
+            <div className="w-1 shrink-0" style={{ background: sentColor(d.v) }}/>
+            <div className="flex-1 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5"
+                  style={{ color: sentColor(d.v), background: sentBg(d.v) }}>
+                  {sentLabel(d.v)}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                  {fmt(d.t)}
+                </span>
+              </div>
+              <div className="text-[12px] font-semibold text-[#14110D] leading-snug mb-0.5">{d.label}</div>
+              {d.note && <p className="text-[11px] text-[#6B5744] leading-relaxed mb-1">{displayNote}</p>}
+              <div className="text-[10px] font-mono text-[#9A8573] mt-0.5 mb-1">{d.v > 0 ? '+' : ''}{d.v.toFixed(2)}</div>
+              <VerifyChip id={vid} content={d.note || d.label}/>
+            </div>
           </div>
         );
       })}
@@ -1965,28 +2144,7 @@ function SentimentTab({ data }) {
       {/* Key moments — flagged tile style */}
       <div>
         <p className="text-[10px] font-bold text-[#9A8573] uppercase tracking-widest mb-2">Key Moments</p>
-        <div className="flex flex-col gap-2">
-          {labeled.map((d, i) => (
-            <button key={i} onClick={() => {}}
-              className="w-full text-left bg-white rounded-xl border border-[#E2E1DF] overflow-hidden hover:bg-[#F0F0EE] transition-colors flex">
-              <div className="w-1 shrink-0" style={{ background: sentColor(d.v) }}/>
-              <div className="flex-1 px-3 py-2.5">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5"
-                    style={{ color: sentColor(d.v), background: sentBg(d.v) }}>
-                    {sentLabel(d.v)}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5 whitespace-nowrap">
-                    {fmt(d.t)}
-                  </span>
-                </div>
-                <div className="text-[12px] font-semibold text-[#14110D] leading-snug mb-0.5">{d.label}</div>
-                {d.note && <p className="text-[11px] text-[#6B5744] leading-relaxed">{d.note}</p>}
-                <div className="text-[10px] font-mono text-[#9A8573] mt-1">{d.v > 0 ? '+' : ''}{d.v.toFixed(2)}</div>
-              </div>
-            </button>
-          ))}
-        </div>
+        <SentimentMoments labeled={labeled} sentColor={sentColor} sentBg={sentBg} sentLabel={sentLabel} fmt={fmt}/>
       </div>
     </div>
   );
@@ -2126,18 +2284,25 @@ function TimelineTab({ events, jump }) {
 }
 
 function SummariesTab({ topics }) {
+  const { getRecord } = useVerifyCtx();
   return (
     <div className="flex flex-col gap-3">
-      {topics.map((t) => (
-        <Card key={t.id} className="p-4">
-          <h4 className="text-sm font-semibold text-[#14110D] mb-1">{t.title}</h4>
-          <p className="text-xs text-[#6B5744] leading-relaxed">{t.summary}</p>
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline">{t.segments.length} segments</Badge>
-            <span className="text-xs text-[#9A8573] tabular-nums font-mono">{Math.floor(t.segments[0].timestamp/60)}:{String(t.segments[0].timestamp%60).padStart(2,'0')}</span>
-          </div>
-        </Card>
-      ))}
+      {topics.map((t) => {
+        const vid = `topic-summary-${t.id}`;
+        const rec = getRecord(vid);
+        const displaySummary = rec?.fixes?.slice(-1)[0]?.fixed || t.summary;
+        return (
+          <Card key={t.id} className="p-4">
+            <h4 className="text-sm font-semibold text-[#14110D] mb-1">{t.title}</h4>
+            <p className="text-xs text-[#6B5744] leading-relaxed mb-1.5">{displaySummary}</p>
+            <div className="mb-1.5"><VerifyChip id={vid} content={t.summary}/></div>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline">{t.segments.length} segments</Badge>
+              <span className="text-xs text-[#9A8573] tabular-nums font-mono">{Math.floor(t.segments[0].timestamp/60)}:{String(t.segments[0].timestamp%60).padStart(2,'0')}</span>
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
@@ -2190,10 +2355,14 @@ function WorkingState({ steps, currentStep, expanded, onToggle }) {
   );
 }
 
-function AiMessage({ msg, onFollowUp }) {
+function AiMessage({ msg, onFollowUp, msgIdx }) {
   const [thumbs, setThumbs] = useState(null);
   const [copied, setCopied] = useState(false);
-  const copy = () => { navigator.clipboard?.writeText(msg.text); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  const { getRecord } = useVerifyCtx();
+  const verifyId = `ai-msg-${msg.id || msgIdx}`;
+  const rec = getRecord(verifyId);
+  const displayText = rec?.fixes?.slice(-1)[0]?.fixed || msg.text;
+  const copy = () => { navigator.clipboard?.writeText(displayText); setCopied(true); setTimeout(() => setCopied(false), 1500); };
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-2">
@@ -2202,8 +2371,8 @@ function AiMessage({ msg, onFollowUp }) {
         </div>
         <span className="text-[11px] font-semibold text-[#9A8573] uppercase tracking-wide">Cognition AI</span>
       </div>
-      <p className="text-[14px] text-[#14110D] leading-relaxed mb-3">{msg.text}</p>
-      <div className="flex items-center gap-3 mb-4">
+      <p className="text-[14px] text-[#14110D] leading-relaxed mb-3">{displayText}</p>
+      <div className="flex items-center gap-3 mb-2 flex-wrap">
         <button onClick={copy} className="flex items-center gap-1.5 text-[12px] text-[#9A8573] hover:text-[#14110D] transition-colors">
           <Ic.fileText size={12}/>{copied ? 'Copied' : 'Copy'}
         </button>
@@ -2213,6 +2382,7 @@ function AiMessage({ msg, onFollowUp }) {
         <button onClick={() => setThumbs('down')} className={cls('text-[12px] transition-colors', thumbs === 'down' ? 'text-[#14110D]' : 'text-[#9A8573] hover:text-[#14110D]')}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill={thumbs==='down'?'currentColor':'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
         </button>
+        <span style={{ marginLeft:2 }}><VerifyChip id={verifyId} content={msg.text}/></span>
       </div>
       {msg.followUps && msg.followUps.length > 0 && (
         <div>
@@ -2294,9 +2464,9 @@ function ChatTab({ depo }) {
         }],
       });
       const followUps = ['What evidence supports this from the transcript?', 'How does this relate to the primary case theory?', 'What follow-up questions should we ask?'];
-      patchActive(s => ({ messages: [...s.messages, { role: 'ai', text: reply, followUps }] }));
+      patchActive(s => ({ messages: [...s.messages, { role: 'ai', id: Date.now().toString(36) + Math.random().toString(36).slice(2), text: reply, followUps }] }));
     } catch {
-      patchActive(s => ({ messages: [...s.messages, { role: 'ai', text: 'Sorry, I had trouble responding. Try again.', followUps: [] }] }));
+      patchActive(s => ({ messages: [...s.messages, { role: 'ai', id: Date.now().toString(36), text: 'Sorry, I had trouble responding. Try again.', followUps: [] }] }));
     }
     setBusy(false);
     inputRef.current?.focus();
@@ -2364,7 +2534,7 @@ function ChatTab({ depo }) {
             {messages.map((m, i) => (
               m.role === 'user'
                 ? <p key={i} className="text-[13px] text-[#9A8573] mb-3 leading-snug">{m.text}</p>
-                : <AiMessage key={i} msg={m} onFollowUp={send}/>
+                : <AiMessage key={i} msg={m} onFollowUp={send} msgIdx={i}/>
             ))}
             {busy && <WorkingState steps={WORKING_STEPS} currentStep={workingStep} expanded={workingExpanded} onToggle={() => setWorkingExpanded((v) => !v)}/>}
             <div ref={scrollRef}/>
@@ -2688,6 +2858,7 @@ function RelationshipMap() {
 // ---------- Contradictions Tab ----------
 function ContradictionsTab({ jump }) {
   const [expanded, setExpanded] = useState(null);
+  const { getRecord } = useVerifyCtx();
   const all = MOCK_DETAIL.contradictions || [];
   const fmt = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 
@@ -2701,12 +2872,15 @@ function ContradictionsTab({ jump }) {
       {all.map((c) => {
         const t = TYPE[c.type] || { label: c.type, strip: '#9A8573', pill: 'bg-[#F0F0EE] text-[#6B5744]' };
         const isOpen = expanded === c.id;
+        const vid = `contradiction-${c.id}`;
+        const rec = getRecord(vid);
+        const displayWhy = rec?.fixes?.slice(-1)[0]?.fixed || c.why;
         return (
           <div key={c.id} className="bg-white rounded-xl border border-[#E2E1DF] overflow-hidden flex">
             <div className="w-1 shrink-0" style={{ background: t.strip }}/>
             <div className="flex-1 min-w-0">
               <button onClick={() => setExpanded(isOpen ? null : c.id)}
-                className="w-full text-left px-4 py-3 hover:bg-[#F0F0EE] transition-colors">
+                className="w-full text-left px-4 pt-3 pb-2 hover:bg-[#F0F0EE] transition-colors">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <span className={cls('text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5', t.pill)}>{t.label}</span>
                   <div className="flex items-center gap-2 shrink-0">
@@ -2718,9 +2892,12 @@ function ContradictionsTab({ jump }) {
                     {isOpen ? <Ic.chevU size={12}/> : <Ic.chevD size={12}/>}
                   </div>
                 </div>
-                <div className="text-[13px] font-semibold text-[#14110D] leading-snug mb-1">{c.title}</div>
-                <p className="text-[11px] text-[#6B5744] leading-relaxed">{c.why}</p>
+                <div className="text-[13px] font-semibold text-[#14110D] leading-snug">{c.title}</div>
               </button>
+              <div className="px-4 pb-2.5">
+                <p className="text-[11px] text-[#6B5744] leading-relaxed mb-1.5">{displayWhy}</p>
+                <VerifyChip id={vid} content={c.why}/>
+              </div>
 
               {isOpen && (
                 <div className="border-t border-[#F0F0EE] px-4 py-3 bg-[#F8F8F7]">
@@ -2746,6 +2923,19 @@ function ContradictionsTab({ jump }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function DepoSummaryBlock() {
+  const { getRecord } = useVerifyCtx();
+  const vid = 'depo-summary';
+  const rec = getRecord(vid);
+  const displayText = rec?.fixes?.slice(-1)[0]?.fixed || MOCK_DETAIL.summary;
+  return (
+    <div className="px-4 pb-4">
+      <p className="text-xs text-[#4A3828] leading-relaxed mb-1.5">{displayText}</p>
+      <VerifyChip id={vid} content={MOCK_DETAIL.summary}/>
     </div>
   );
 }
@@ -2924,9 +3114,7 @@ function DepositionDetail({ id, onBack }) {
               <Ic.chevD size={12} className={cls('text-[#9A8573] transition-transform', sideCollapsed.summary && '-rotate-90')}/>
             </button>
             {!sideCollapsed.summary && (
-              <div className="px-4 pb-4">
-                <p className="text-xs text-[#4A3828] leading-relaxed">{MOCK_DETAIL.summary}</p>
-              </div>
+              <DepoSummaryBlock/>
             )}
           </div>
 
@@ -3403,7 +3591,7 @@ function AppContent() {
 }
 
 function App() {
-  return <ToastProvider><AuthProvider><AppContent/></AuthProvider></ToastProvider>;
+  return <ToastProvider><AuthProvider><VerifyProvider><AppContent/></VerifyProvider></AuthProvider></ToastProvider>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
