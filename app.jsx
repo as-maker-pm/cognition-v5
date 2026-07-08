@@ -212,8 +212,8 @@ function VerifyChip({ id, content }) {
 
   return (
     <>
-      {/* Trigger: sits at absolute top-right of parent (parent must be position:relative) */}
-      <div style={{ position:'absolute', top:8, right:8, display:'flex', alignItems:'center', gap:4, zIndex:10 }}>
+      {/* Inline trigger — place inside header row */}
+      <span style={{ display:'inline-flex', alignItems:'center', gap:3, flexShrink:0, lineHeight:1 }}>
         {record?.verified && (
           <span ref={badgeRef}
             style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:9.5, fontWeight:600,
@@ -234,7 +234,7 @@ function VerifyChip({ id, content }) {
           onMouseLeave={e => { if (!menuOpen) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#C4B5A2'; } }}>
           <Ic.more size={13}/>
         </button>
-      </div>
+      </span>
 
       {/* Dropdown — portaled to body */}
       {menuOpen && coords.menu && ReactDOM.createPortal(
@@ -2049,19 +2049,17 @@ function FlaggedTab({ items, jump }) {
                       style={{ border: `1px solid ${cfg.color}22` }}>
                       <div className="flex items-stretch">
                         <div className="w-1 shrink-0 rounded-l-lg" style={{ background: cfg.color }}/>
-                        <div className="flex-1 px-3 py-2.5" style={{ position:'relative' }}>
-                          <div onClick={() => jump(f.timestamp)} className="cursor-pointer hover:opacity-80 transition-opacity">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: cfg.bg, color: cfg.color }}>
-                                  {f.type.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                </span>
-                              </div>
-                              <span className="inline-flex items-center text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5 shrink-0 whitespace-nowrap">{fmt(f.timestamp)}</span>
+                        <div className="flex-1 px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: cfg.bg, color: cfg.color }}>
+                              {f.type.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <VerifyChip id={vid} content={f.description}/>
+                              <span className="inline-flex items-center text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5 whitespace-nowrap">{fmt(f.timestamp)}</span>
                             </div>
-                            <div className="text-[12px] text-[#374151] leading-relaxed mb-1.5">{displayDesc}</div>
                           </div>
-                          <VerifyChip id={vid} content={f.description}/>
+                          <div onClick={() => jump(f.timestamp)} className="text-[12px] text-[#374151] leading-relaxed cursor-pointer hover:opacity-80 transition-opacity">{displayDesc}</div>
                         </div>
                       </div>
                     </div>
@@ -2088,20 +2086,22 @@ function SentimentMoments({ labeled, sentColor, sentBg, sentLabel, fmt }) {
           <div key={i}
             className="w-full text-left bg-white rounded-xl border border-[#E2E1DF] overflow-hidden flex">
             <div className="w-1 shrink-0" style={{ background: sentColor(d.v) }}/>
-            <div className="flex-1 px-3 py-2.5" style={{ position:'relative' }}>
-              <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex-1 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5"
                   style={{ color: sentColor(d.v), background: sentBg(d.v) }}>
                   {sentLabel(d.v)}
                 </span>
-                <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5 whitespace-nowrap">
-                  {fmt(d.t)}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <VerifyChip id={vid} content={d.note || d.label}/>
+                  <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                    {fmt(d.t)}
+                  </span>
+                </div>
               </div>
               <div className="text-[12px] font-semibold text-[#14110D] leading-snug mb-0.5">{d.label}</div>
               {d.note && <p className="text-[11px] text-[#6B5744] leading-relaxed mb-1">{displayNote}</p>}
-              <div className="text-[10px] font-mono text-[#9A8573] mt-0.5 mb-1">{d.v > 0 ? '+' : ''}{d.v.toFixed(2)}</div>
-              <VerifyChip id={vid} content={d.note || d.label}/>
+              <div className="text-[10px] font-mono text-[#9A8573] mt-0.5">{d.v > 0 ? '+' : ''}{d.v.toFixed(2)}</div>
             </div>
           </div>
         );
@@ -2221,6 +2221,7 @@ function SentimentTab({ data }) {
 }
 
 function TimelineTab({ events, jump }) {
+  const { getRecord } = useVerifyCtx();
   const fmt = (d) => {
     const [y, m, day] = d.split('-');
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -2262,7 +2263,11 @@ function TimelineTab({ events, jump }) {
             <div className="absolute left-[7px] top-3 bottom-3 w-px bg-[#E2E1DF]"/>
 
             <div className="flex flex-col gap-3">
-              {grouped[date].map((ev) => (
+              {grouped[date].map((ev, evIdx) => {
+                const tvid = `timeline-${ev.id || evIdx}`;
+                const trec = getRecord(tvid);
+                const displayDesc = trec?.fixes?.slice(-1)[0]?.fixed || ev.description;
+                return (
                 <div key={ev.id} className="relative">
                   <div className={cls(
                     'absolute -left-[19px] top-4 w-3 h-3 rounded-full border-2 z-10',
@@ -2282,11 +2287,14 @@ function TimelineTab({ events, jump }) {
                         )}
                         <div className="text-[13px] font-semibold text-[#14110D] leading-snug">{ev.title}</div>
                       </div>
-                      {ev.contradiction && (
-                        <span className="shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#DC2626] bg-[#FEE2E2] px-2 py-0.5 rounded-full whitespace-nowrap mt-0.5">
-                          <Ic.alert size={8}/> Conflict
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                        {ev.contradiction && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#DC2626] bg-[#FEE2E2] px-2 py-0.5 rounded-full whitespace-nowrap">
+                            <Ic.alert size={8}/> Conflict
+                          </span>
+                        )}
+                        <VerifyChip id={tvid} content={ev.description}/>
+                      </div>
                     </div>
 
                     {/* Mentioned by — inline attribution under title */}
@@ -2297,7 +2305,7 @@ function TimelineTab({ events, jump }) {
                       </div>
                     )}
 
-                    <p className="text-[12px] text-[#6B5744] leading-relaxed mb-3">{ev.description}</p>
+                    <p className="text-[12px] text-[#6B5744] leading-relaxed mb-3">{displayDesc}</p>
 
                     {ev.references && ev.references.length > 0 && (
                       <div className="flex items-center gap-2 mb-1.5">
@@ -2344,7 +2352,8 @@ function TimelineTab({ events, jump }) {
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
         </div>
@@ -2362,14 +2371,16 @@ function SummariesTab({ topics }) {
         const rec = getRecord(vid);
         const displaySummary = rec?.fixes?.slice(-1)[0]?.fixed || t.summary;
         return (
-          <Card key={t.id} className="p-4" style={{ position:'relative' }}>
-            <h4 className="text-sm font-semibold text-[#14110D] mb-1">{t.title}</h4>
+          <Card key={t.id} className="p-4">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <h4 className="text-sm font-semibold text-[#14110D]">{t.title}</h4>
+              <VerifyChip id={vid} content={t.summary}/>
+            </div>
             <p className="text-xs text-[#6B5744] leading-relaxed mb-1.5">{displaySummary}</p>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="outline">{t.segments.length} segments</Badge>
               <span className="text-xs text-[#9A8573] tabular-nums font-mono">{Math.floor(t.segments[0].timestamp/60)}:{String(t.segments[0].timestamp%60).padStart(2,'0')}</span>
             </div>
-            <VerifyChip id={vid} content={t.summary}/>
           </Card>
         );
       })}
@@ -2434,12 +2445,13 @@ function AiMessage({ msg, onFollowUp, msgIdx }) {
   const displayText = rec?.fixes?.slice(-1)[0]?.fixed || msg.text;
   const copy = () => { navigator.clipboard?.writeText(displayText); setCopied(true); setTimeout(() => setCopied(false), 1500); };
   return (
-    <div className="mb-6" style={{ position:'relative' }}>
+    <div className="mb-6">
       <div className="flex items-center gap-2 mb-2">
         <div className="w-4 h-4 rounded-full bg-[#14110D] flex items-center justify-center shrink-0">
           <Ic.sparkles size={8} className="text-white"/>
         </div>
-        <span className="text-[11px] font-semibold text-[#9A8573] uppercase tracking-wide">Cognition AI</span>
+        <span className="text-[11px] font-semibold text-[#9A8573] uppercase tracking-wide flex-1">Cognition AI</span>
+        <VerifyChip id={verifyId} content={msg.text}/>
       </div>
       <p className="text-[14px] text-[#14110D] leading-relaxed mb-3">{displayText}</p>
       <div className="flex items-center gap-3 mb-1.5">
@@ -2466,7 +2478,6 @@ function AiMessage({ msg, onFollowUp, msgIdx }) {
           </div>
         </div>
       )}
-      <VerifyChip id={verifyId} content={msg.text}/>
     </div>
   );
 }
@@ -2948,24 +2959,25 @@ function ContradictionsTab({ jump }) {
         return (
           <div key={c.id} className="bg-white rounded-xl border border-[#E2E1DF] overflow-hidden flex">
             <div className="w-1 shrink-0" style={{ background: t.strip }}/>
-            <div className="flex-1 min-w-0" style={{ position:'relative' }}>
-              <button onClick={() => setExpanded(isOpen ? null : c.id)}
-                className="w-full text-left px-4 pt-3 pb-2 hover:bg-[#F0F0EE] transition-colors">
-                <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex-1 min-w-0">
+              <div onClick={() => setExpanded(isOpen ? null : c.id)}
+                className="px-4 pt-3 pb-2 hover:bg-[#F0F0EE] transition-colors cursor-pointer">
+                <div className="flex items-center justify-between gap-2 mb-1">
                   <span className={cls('text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5', t.pill)}>{t.label}</span>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {c.severity === 'high' && (
                       <span className="inline-flex items-center gap-1 text-[9px] text-rose-600 bg-rose-50 rounded-full px-1.5 py-0.5">
                         <Ic.alert size={8}/> High
                       </span>
                     )}
+                    <VerifyChip id={vid} content={c.why}/>
                     {isOpen ? <Ic.chevU size={12}/> : <Ic.chevD size={12}/>}
                   </div>
                 </div>
                 <div className="text-[13px] font-semibold text-[#14110D] leading-snug">{c.title}</div>
-              </button>
+              </div>
               <div className="px-4 pb-2.5">
-                <p className="text-[11px] text-[#6B5744] leading-relaxed mb-1.5">{displayWhy}</p>
+                <p className="text-[11px] text-[#6B5744] leading-relaxed">{displayWhy}</p>
               </div>
 
               {isOpen && (
@@ -2988,7 +3000,6 @@ function ContradictionsTab({ jump }) {
                   </div>
                 </div>
               )}
-              <VerifyChip id={vid} content={c.why}/>
             </div>
           </div>
         );
@@ -3003,9 +3014,8 @@ function DepoSummaryBlock() {
   const rec = getRecord(vid);
   const displayText = rec?.fixes?.slice(-1)[0]?.fixed || MOCK_DETAIL.summary;
   return (
-    <div className="px-4 pb-4" style={{ position:'relative' }}>
-      <p className="text-xs text-[#4A3828] leading-relaxed mb-1.5">{displayText}</p>
-      <VerifyChip id={vid} content={MOCK_DETAIL.summary}/>
+    <div className="px-4 pb-4">
+      <p className="text-xs text-[#4A3828] leading-relaxed">{displayText}</p>
     </div>
   );
 }
@@ -3016,6 +3026,7 @@ function ExhibitsTab({ jump }) {
   const contradictionCount = exhibits.reduce((s, e) => s + e.contradictions, 0);
   const fmt = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
   const [expanded, setExpanded] = useState(null);
+  const { getRecord } = useVerifyCtx();
 
   const CAT = {
     Contract: { pill: 'bg-amber-50 text-amber-700',     strip: '#F59E0B' },
@@ -3057,31 +3068,35 @@ function ExhibitsTab({ jump }) {
       {exhibits.map((e) => {
         const isOpen = expanded === e.id;
         const citations = EXHIBIT_CITATIONS[e.id] || [];
+        const evid = `exhibit-${e.id}`;
+        const erec = getRecord(evid);
+        const displayDesc = erec?.fixes?.slice(-1)[0]?.fixed || e.desc;
         return (
           <div key={e.id} className="bg-white rounded-xl border border-[#E2E1DF] overflow-hidden flex">
             <div className="w-1 shrink-0" style={{ background: cat(e).strip }}/>
             <div className="flex-1 min-w-0">
               {/* Main row — click to expand */}
-              <button onClick={() => setExpanded(isOpen ? null : e.id)}
-                className="w-full text-left px-4 py-3 hover:bg-[#F0F0EE] transition-colors">
-                <div className="flex items-start justify-between gap-2 mb-1">
+              <div onClick={() => setExpanded(isOpen ? null : e.id)}
+                className="px-4 py-3 hover:bg-[#F0F0EE] transition-colors cursor-pointer">
+                <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-[10px] font-mono font-bold text-[#9A8573] bg-[#F0F0EE] rounded-full px-2 py-0.5 whitespace-nowrap">{e.label}</span>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {e.contradictions > 0 && (
                       <span className="inline-flex items-center gap-1 text-[9px] text-rose-600 bg-rose-50 rounded-full px-1.5 py-0.5">
                         <Ic.alert size={8}/> {e.contradictions} conflict{e.contradictions > 1 ? 's' : ''}
                       </span>
                     )}
+                    <VerifyChip id={evid} content={e.desc}/>
                     {isOpen ? <Ic.chevU size={12}/> : <Ic.chevD size={12}/>}
                   </div>
                 </div>
                 <div className="text-[13px] font-semibold text-[#14110D] leading-snug mb-1">{e.title}</div>
-                <p className="text-[11px] text-[#6B5744] leading-relaxed mb-2">{e.desc}</p>
+                <p className="text-[11px] text-[#6B5744] leading-relaxed mb-2">{displayDesc}</p>
                 <div className="flex items-center gap-2">
                   <span className={cls('text-[9px] font-medium rounded-full px-2 py-0.5', cat(e).pill)}>{e.category}</span>
                   <span className="text-[10px] text-[#9A8573] ml-auto">{e.references} transcript refs</span>
                 </div>
-              </button>
+              </div>
 
               {/* Expanded citations */}
               {isOpen && citations.length > 0 && (
@@ -3178,11 +3193,15 @@ function DepositionDetail({ id, onBack }) {
 
           {/* Summary */}
           <div className="border-b border-[#E2E1DF]">
-            <button onClick={() => setSideCollapsed(c => ({ ...c, summary: !c.summary }))}
-              className="w-full flex items-center justify-between px-4 pt-4 pb-3 hover:bg-[#E9E8E7]/40 transition-colors">
+            <div className="w-full flex items-center justify-between px-4 pt-4 pb-3 hover:bg-[#E9E8E7]/40 transition-colors">
               <span className="text-[13px] font-semibold text-[#14110D]">Summary</span>
-              <Ic.chevD size={12} className={cls('text-[#9A8573] transition-transform', sideCollapsed.summary && '-rotate-90')}/>
-            </button>
+              <div className="flex items-center gap-1.5">
+                <VerifyChip id="depo-summary" content={MOCK_DETAIL.summary}/>
+                <button onClick={() => setSideCollapsed(c => ({ ...c, summary: !c.summary }))} className="flex items-center justify-center">
+                  <Ic.chevD size={12} className={cls('text-[#9A8573] transition-transform', sideCollapsed.summary && '-rotate-90')}/>
+                </button>
+              </div>
+            </div>
             {!sideCollapsed.summary && (
               <DepoSummaryBlock/>
             )}
@@ -3215,7 +3234,10 @@ function DepositionDetail({ id, onBack }) {
                       {g.covered && <Ic.check size={9}/>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className={cls('text-xs leading-snug', g.covered ? 'text-[#4A3828]' : 'text-[#7A6A58]')}>{g.title}</div>
+                      <div className="flex items-start justify-between gap-1">
+                        <div className={cls('text-xs leading-snug flex-1', g.covered ? 'text-[#4A3828]' : 'text-[#7A6A58]')}>{g.title}</div>
+                        <VerifyChip id={`sidebar-goal-${g.id}`} content={g.notes || g.title}/>
+                      </div>
                       {g.notes && <div className="text-[10px] text-[#9A8573] mt-0.5">{g.notes}</div>}
                       {g.citations?.length > 0 && (
                         <div className="mt-1.5 flex flex-wrap gap-1">
@@ -3248,22 +3270,28 @@ function DepositionDetail({ id, onBack }) {
             </button>
             {!sideCollapsed.topics && (
               <div className="px-4 pb-4">
-                {MOCK_DETAIL.topics.map((topic, i) => (
+                {MOCK_DETAIL.topics.map((topic, i) => {
+                  const tvid = `sidebar-topic-${topic.id}`;
+                  return (
                   <div key={topic.id} className="py-2.5 border-b border-[#E9E8E7] last:border-0">
-                    <button
-                      onClick={() => setCurrentTime(topic.segments[0]?.timestamp || 0)}
-                      className="flex items-center gap-2.5 w-full hover:opacity-80 transition-opacity text-left">
+                    <div className="flex items-center gap-2.5 w-full">
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ background: topicColors[i % topicColors.length] }}/>
-                      <span className="text-xs font-medium text-[#4A3828] flex-1">{topic.title}</span>
+                      <button
+                        onClick={() => setCurrentTime(topic.segments[0]?.timestamp || 0)}
+                        className="flex-1 text-left hover:opacity-80 transition-opacity">
+                        <span className="text-xs font-medium text-[#4A3828]">{topic.title}</span>
+                      </button>
+                      <VerifyChip id={tvid} content={topic.summary || topic.title}/>
                       <span className="text-[10px] text-[#9A8573] font-mono shrink-0">
                         {Math.floor((topic.segments[0]?.timestamp || 0)/60)}:{String((topic.segments[0]?.timestamp || 0)%60).padStart(2,'0')}
                       </span>
-                    </button>
+                    </div>
                     {topic.summary && (
-                      <p className="text-[10px] text-[#9A8573] leading-relaxed mt-1.5 pl-4.5" style={{ paddingLeft: '18px' }}>{topic.summary}</p>
+                      <p className="text-[10px] text-[#9A8573] leading-relaxed mt-1.5" style={{ paddingLeft: '18px' }}>{topic.summary}</p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
