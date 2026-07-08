@@ -2650,6 +2650,7 @@ function ChatTab({ depo }) {
 
 // ---------- Relationship Map ----------
 function RelationshipMap() {
+  const { getRecord } = useVerifyCtx();
   const containerRef = useRef(null);
   const [pos, setPos] = useState({
     ph:        {x:175, y:100}, db:       {x:790, y:100},
@@ -2874,19 +2875,25 @@ function RelationshipMap() {
         <div style={{ width:228, flexShrink:0, borderLeft:'1px solid #E2E1DF',
           overflowY:'auto', background:'#F8F8F7' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-            padding:'14px 16px 4px' }}>
-            <span style={{ fontSize:13, fontWeight:600, color:'#14110D' }}>{selNode.label}</span>
+            padding:'14px 16px 4px', gap:6 }}>
+            <span style={{ fontSize:13, fontWeight:600, color:'#14110D', flex:1, minWidth:0,
+              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{selNode.label}</span>
+            <VerifyChip id={`map-node-${selNode.id}`} content={selNode.sub || selNode.label}/>
             <button onClick={() => setSelected(null)}
               style={{ width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center',
-                borderRadius:4, background:'none', border:'none', cursor:'pointer', color:'#9A8573' }}>
+                borderRadius:4, background:'none', border:'none', cursor:'pointer', color:'#9A8573', flexShrink:0 }}>
               <Ic.x size={11}/>
             </button>
           </div>
-          {selNode.sub && (
-            <p style={{ fontSize:11, color:'#9A8573', margin:'0 0 8px', padding:'0 16px' }}>
-              {selNode.sub}
-            </p>
-          )}
+          {selNode.sub && (() => {
+            const mapRec = getRecord(`map-node-${selNode.id}`);
+            const displaySub = mapRec?.fixes?.slice(-1)[0]?.fixed || selNode.sub;
+            return (
+              <p style={{ fontSize:11, color:'#9A8573', margin:'0 0 8px', padding:'0 16px' }}>
+                {displaySub}
+              </p>
+            );
+          })()}
           <div style={{ padding:'12px 16px', borderTop:'1px solid #E2E1DF' }}>
             <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase',
               letterSpacing:'0.1em', color:'#9A8573', marginBottom:8 }}>Connections</p>
@@ -3274,17 +3281,17 @@ function DepositionDetail({ id, onBack }) {
                   const tvid = `sidebar-topic-${topic.id}`;
                   return (
                   <div key={topic.id} className="py-2.5 border-b border-[#E9E8E7] last:border-0">
-                    <div className="flex items-center gap-2.5 w-full">
+                    <div className="flex items-center gap-2 w-full">
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ background: topicColors[i % topicColors.length] }}/>
-                      <button
-                        onClick={() => setCurrentTime(topic.segments[0]?.timestamp || 0)}
-                        className="flex-1 text-left hover:opacity-80 transition-opacity">
-                        <span className="text-xs font-medium text-[#4A3828]">{topic.title}</span>
-                      </button>
-                      <VerifyChip id={tvid} content={topic.summary || topic.title}/>
                       <span className="text-[10px] text-[#9A8573] font-mono shrink-0">
                         {Math.floor((topic.segments[0]?.timestamp || 0)/60)}:{String((topic.segments[0]?.timestamp || 0)%60).padStart(2,'0')}
                       </span>
+                      <button
+                        onClick={() => setCurrentTime(topic.segments[0]?.timestamp || 0)}
+                        className="flex-1 text-left hover:opacity-80 transition-opacity min-w-0">
+                        <span className="text-xs font-medium text-[#4A3828] truncate block">{topic.title}</span>
+                      </button>
+                      <VerifyChip id={tvid} content={topic.summary || topic.title}/>
                     </div>
                     {topic.summary && (
                       <p className="text-[10px] text-[#9A8573] leading-relaxed mt-1.5" style={{ paddingLeft: '18px' }}>{topic.summary}</p>
