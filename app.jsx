@@ -147,11 +147,22 @@ const Card = ({ className = '', children, ...rest }) => (
 function VerifyChip({ id, content }) {
   const { doVerify, doFix, getRecord } = useVerifyCtx();
   const { user } = useAuth();
+  const toast = useToast();
   const record = getRecord(id);
-  const [fixOpen, setFixOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mode, setMode] = useState(null); // 'fix' | 'report'
   const [fixText, setFixText] = useState('');
   const [fixNote, setFixNote] = useState('');
+  const [reportText, setReportText] = useState('');
   const [tipVisible, setTipVisible] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const h = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [menuOpen]);
 
   const fmt = (iso) => {
     try {
@@ -162,96 +173,119 @@ function VerifyChip({ id, content }) {
   };
 
   const latestFix = record?.fixes?.slice(-1)[0];
+  const byName = user?.name || user?.email || 'Team member';
 
-  if (record?.verified) {
-    return (
-      <span style={{ position:'relative', display:'inline-flex', alignItems:'center', verticalAlign:'middle' }}
-        onMouseEnter={() => setTipVisible(true)} onMouseLeave={() => setTipVisible(false)}>
-        <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:10, fontWeight:600,
-          padding:'2px 7px', borderRadius:99, cursor:'default', userSelect:'none', whiteSpace:'nowrap',
-          background: latestFix ? '#EFF6FF' : '#F0FDF4',
-          border: `1px solid ${latestFix ? '#BFDBFE' : '#BBF7D0'}`,
-          color: latestFix ? '#1D4E89' : '#3D6B2E' }}>
-          <Ic.checkC size={9}/>
-          {latestFix ? 'Fixed' : 'Verified'}
-        </span>
-        {tipVisible && (
-          <div style={{ position:'absolute', bottom:'calc(100% + 7px)', left:0, zIndex:60,
-            background:'#1C1917', borderRadius:9, padding:'9px 13px', fontSize:11, color:'#E7E5E4',
-            lineHeight:1.6, minWidth:190, boxShadow:'0 8px 28px rgba(0,0,0,0.38)',
-            pointerEvents:'none', whiteSpace:'nowrap' }}>
-            {latestFix ? (
-              <>
-                <p style={{ fontWeight:700, color:'#FFF', marginBottom:2 }}>Fixed &amp; Verified</p>
-                <p style={{ color:'#A8A29E' }}>by {latestFix.by}</p>
-                <p style={{ color:'#78716C', fontSize:10 }}>{fmt(latestFix.at)}</p>
-                {latestFix.note && (
-                  <p style={{ color:'#D6D3D1', marginTop:6, fontStyle:'italic', whiteSpace:'normal',
-                    maxWidth:240, borderTop:'1px solid #3C3836', paddingTop:6 }}>"{latestFix.note}"</p>
+  const openMode = (m) => { setMode(prev => prev === m ? null : m); if (m === 'fix') setFixText(content || ''); setMenuOpen(false); };
+
+  const menuItems = [
+    { icon: <Ic.checkC size={13}/>, label: record?.verified ? 'Re-verify' : 'Verify', color: '#3D6B2E',
+      action: () => { doVerify(id, byName); setMenuOpen(false); toast?.success('Verified', `Marked as verified by ${byName}`); } },
+    { icon: <Ic.edit size={13}/>, label: 'Fix', color: '#4A3828',
+      action: () => openMode('fix') },
+    { icon: <Ic.flag size={13}/>, label: 'Report issue', color: '#7A2E20',
+      action: () => openMode('report') },
+  ];
+
+  return (
+    <div style={{ display:'inline-block' }}>
+      {/* Badge + dots row */}
+      <div style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+        {record?.verified && (
+          <div style={{ position:'relative', display:'inline-flex' }}
+            onMouseEnter={() => setTipVisible(true)} onMouseLeave={() => setTipVisible(false)}>
+            <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:9.5, fontWeight:600,
+              padding:'2px 7px', borderRadius:99, cursor:'default', userSelect:'none', whiteSpace:'nowrap',
+              background: latestFix ? '#EFF6FF' : '#F0FDF4',
+              border: `1px solid ${latestFix ? '#BFDBFE' : '#BBF7D0'}`,
+              color: latestFix ? '#1D4E89' : '#3D6B2E' }}>
+              <Ic.checkC size={9}/>
+              {latestFix ? 'Fixed' : 'Verified'}
+            </span>
+            {tipVisible && (
+              <div style={{ position:'absolute', bottom:'calc(100% + 7px)', left:0, zIndex:70,
+                background:'#1C1917', borderRadius:9, padding:'9px 13px', fontSize:11, color:'#E7E5E4',
+                lineHeight:1.6, minWidth:190, boxShadow:'0 8px 28px rgba(0,0,0,0.38)',
+                pointerEvents:'none', whiteSpace:'nowrap' }}>
+                {latestFix ? (
+                  <>
+                    <p style={{ fontWeight:700, color:'#FFF', marginBottom:2 }}>Fixed &amp; Verified</p>
+                    <p style={{ color:'#A8A29E' }}>by {latestFix.by}</p>
+                    <p style={{ color:'#78716C', fontSize:10 }}>{fmt(latestFix.at)}</p>
+                    {latestFix.note && (
+                      <p style={{ color:'#D6D3D1', marginTop:6, fontStyle:'italic', whiteSpace:'normal',
+                        maxWidth:240, borderTop:'1px solid #3C3836', paddingTop:6 }}>"{latestFix.note}"</p>
+                    )}
+                    {record.fixes.length > 1 && (
+                      <p style={{ color:'#57534E', marginTop:4, fontSize:10 }}>{record.fixes.length} revisions</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontWeight:700, color:'#FFF', marginBottom:2 }}>Verified</p>
+                    <p style={{ color:'#A8A29E' }}>by {record.by}</p>
+                    <p style={{ color:'#78716C', fontSize:10 }}>{fmt(record.at)}</p>
+                  </>
                 )}
-                {record.fixes.length > 1 && (
-                  <p style={{ color:'#57534E', marginTop:4, fontSize:10 }}>{record.fixes.length} revisions</p>
-                )}
-              </>
-            ) : (
-              <>
-                <p style={{ fontWeight:700, color:'#FFF', marginBottom:2 }}>Verified</p>
-                <p style={{ color:'#A8A29E' }}>by {record.by}</p>
-                <p style={{ color:'#78716C', fontSize:10 }}>{fmt(record.at)}</p>
-              </>
+              </div>
             )}
           </div>
         )}
-      </span>
-    );
-  }
 
-  const byName = user?.name || user?.email || 'Team member';
-  return (
-    <span>
-      <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
-        <button onClick={() => doVerify(id, byName)}
-          style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:10, fontWeight:500,
-            padding:'2px 7px', borderRadius:99, border:'1px solid #D0CAC3', background:'transparent',
-            color:'#9A8573', cursor:'pointer', transition:'all 0.12s' }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor='#BBF7D0'; e.currentTarget.style.color='#3D6B2E'; e.currentTarget.style.background='#F0FDF4'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor='#D0CAC3'; e.currentTarget.style.color='#9A8573'; e.currentTarget.style.background='transparent'; }}>
-          <Ic.checkC size={9}/>Verify
-        </button>
-        <button onClick={() => { setFixOpen(v => !v); if (!fixOpen) setFixText(content); }}
-          style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:10, fontWeight:500,
-            padding:'2px 7px', borderRadius:99, border:'1px solid #D0CAC3', background:'transparent',
-            color:'#9A8573', cursor:'pointer', transition:'all 0.12s' }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor='#FECACA'; e.currentTarget.style.color='#7A2E20'; e.currentTarget.style.background='#FFF5F5'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor='#D0CAC3'; e.currentTarget.style.color='#9A8573'; e.currentTarget.style.background='transparent'; }}>
-          <Ic.edit size={9}/>Fix
-        </button>
-      </span>
-      {fixOpen && (
+        {/* 3-dot trigger */}
+        <div ref={menuRef} style={{ position:'relative' }}>
+          <button onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o); }}
+            style={{ width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center',
+              borderRadius:5, border:'none', background: menuOpen ? '#E9E8E7' : 'transparent',
+              cursor:'pointer', color: menuOpen ? '#6B5744' : '#C4B5A2', transition:'all 0.12s',
+              padding:0 }}
+            onMouseEnter={e => { e.currentTarget.style.background='#E9E8E7'; e.currentTarget.style.color='#6B5744'; }}
+            onMouseLeave={e => { if (!menuOpen) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#C4B5A2'; } }}>
+            <Ic.more size={12}/>
+          </button>
+          {menuOpen && (
+            <div style={{ position:'absolute', left:0, top:'calc(100% + 4px)', zIndex:65,
+              background:'#F8F8F7', border:'1px solid #E2E1DF', borderRadius:8,
+              boxShadow:'0 4px 18px rgba(0,0,0,0.13)', padding:4, minWidth:152 }}>
+              {menuItems.map((item, i) => (
+                <button key={i} onClick={(e) => { e.stopPropagation(); item.action(); }}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'6px 10px',
+                    borderRadius:5, border:'none', background:'transparent', cursor:'pointer',
+                    fontSize:12, color:'#3D2E1E', textAlign:'left', transition:'background 0.1s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background='#EDEAE5'; e.currentTarget.querySelector('span').style.color = item.color; }}
+                  onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.querySelector('span').style.color='#9A8573'; }}>
+                  <span style={{ color:'#9A8573', display:'flex', transition:'color 0.1s' }}>{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Fix form */}
+      {mode === 'fix' && (
         <div style={{ marginTop:8, borderRadius:8, border:'1px solid #E2E1DF', background:'#FAFAF9',
-          padding:'10px 12px', display:'block' }}>
+          padding:'10px 12px', minWidth:240 }}>
           <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.09em',
             color:'#9A8573', marginBottom:6 }}>Correction</p>
           <textarea value={fixText} onChange={e => setFixText(e.target.value)} rows={3}
             style={{ width:'100%', borderRadius:6, border:'1px solid #D0CAC3', background:'#FFF',
               padding:'6px 8px', fontSize:11, color:'#14110D', resize:'vertical', outline:'none',
-              fontFamily:'inherit', boxSizing:'border-box', display:'block' }}
+              fontFamily:'inherit', boxSizing:'border-box' }}
             onFocus={e => e.target.style.borderColor='#14110D'}
             onBlur={e => e.target.style.borderColor='#D0CAC3'}/>
           <input placeholder="Note on this fix (optional)" value={fixNote} onChange={e => setFixNote(e.target.value)}
             style={{ width:'100%', marginTop:6, borderRadius:6, border:'1px solid #D0CAC3', background:'#FFF',
               padding:'5px 8px', fontSize:11, color:'#14110D', outline:'none',
-              fontFamily:'inherit', boxSizing:'border-box', display:'block' }}
+              fontFamily:'inherit', boxSizing:'border-box' }}
             onFocus={e => e.target.style.borderColor='#14110D'}
             onBlur={e => e.target.style.borderColor='#D0CAC3'}/>
           <div style={{ display:'flex', justifyContent:'flex-end', gap:6, marginTop:8 }}>
-            <button onClick={() => { setFixOpen(false); setFixText(''); setFixNote(''); }}
+            <button onClick={() => { setMode(null); setFixText(''); setFixNote(''); }}
               style={{ padding:'4px 10px', borderRadius:6, border:'1px solid #D0CAC3',
-                background:'transparent', fontSize:11, color:'#6B5744', cursor:'pointer' }}>
-              Cancel
-            </button>
-            <button
-              onClick={() => { doFix(id, content, fixText, fixNote, byName); setFixOpen(false); setFixNote(''); }}
+                background:'transparent', fontSize:11, color:'#6B5744', cursor:'pointer' }}>Cancel</button>
+            <button onClick={() => { doFix(id, content, fixText, fixNote, byName); setMode(null); setFixNote('');
+                toast?.success('Fix applied', 'Content updated and marked as verified'); }}
               disabled={!fixText.trim() || fixText.trim() === (content||'').trim()}
               style={{ padding:'4px 10px', borderRadius:6, border:'none', background:'#14110D',
                 color:'#FFF', fontSize:11, fontWeight:500, cursor:'pointer',
@@ -261,7 +295,36 @@ function VerifyChip({ id, content }) {
           </div>
         </div>
       )}
-    </span>
+
+      {/* Report form */}
+      {mode === 'report' && (
+        <div style={{ marginTop:8, borderRadius:8, border:'1px solid #FECACA', background:'#FFF5F5',
+          padding:'10px 12px', minWidth:240 }}>
+          <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.09em',
+            color:'#9A8573', marginBottom:6 }}>Report Issue</p>
+          <textarea value={reportText} onChange={e => setReportText(e.target.value)} rows={2}
+            placeholder="Describe the issue with this content…"
+            style={{ width:'100%', borderRadius:6, border:'1px solid #FECACA', background:'#FFF',
+              padding:'6px 8px', fontSize:11, color:'#14110D', resize:'none', outline:'none',
+              fontFamily:'inherit', boxSizing:'border-box' }}
+            onFocus={e => e.target.style.borderColor='#F87171'}
+            onBlur={e => e.target.style.borderColor='#FECACA'}/>
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:6, marginTop:8 }}>
+            <button onClick={() => { setMode(null); setReportText(''); }}
+              style={{ padding:'4px 10px', borderRadius:6, border:'1px solid #D0CAC3',
+                background:'transparent', fontSize:11, color:'#6B5744', cursor:'pointer' }}>Cancel</button>
+            <button onClick={() => { setMode(null); setReportText('');
+                toast?.success('Issue reported', 'Your report has been submitted for review'); }}
+              disabled={!reportText.trim()}
+              style={{ padding:'4px 10px', borderRadius:6, border:'none', background:'#7A2E20',
+                color:'#FFF', fontSize:11, fontWeight:500, cursor:'pointer',
+                opacity: !reportText.trim() ? 0.38 : 1 }}>
+              Submit Report
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2372,7 +2435,7 @@ function AiMessage({ msg, onFollowUp, msgIdx }) {
         <span className="text-[11px] font-semibold text-[#9A8573] uppercase tracking-wide">Cognition AI</span>
       </div>
       <p className="text-[14px] text-[#14110D] leading-relaxed mb-3">{displayText}</p>
-      <div className="flex items-center gap-3 mb-2 flex-wrap">
+      <div className="flex items-center gap-3 mb-1.5">
         <button onClick={copy} className="flex items-center gap-1.5 text-[12px] text-[#9A8573] hover:text-[#14110D] transition-colors">
           <Ic.fileText size={12}/>{copied ? 'Copied' : 'Copy'}
         </button>
@@ -2382,7 +2445,7 @@ function AiMessage({ msg, onFollowUp, msgIdx }) {
         <button onClick={() => setThumbs('down')} className={cls('text-[12px] transition-colors', thumbs === 'down' ? 'text-[#14110D]' : 'text-[#9A8573] hover:text-[#14110D]')}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill={thumbs==='down'?'currentColor':'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
         </button>
-        <span style={{ marginLeft:2 }}><VerifyChip id={verifyId} content={msg.text}/></span>
+        <VerifyChip id={verifyId} content={msg.text}/>
       </div>
       {msg.followUps && msg.followUps.length > 0 && (
         <div>
