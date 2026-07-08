@@ -2399,158 +2399,281 @@ function ChatTab({ depo }) {
 
 // ---------- Relationship Map ----------
 function RelationshipMap() {
-  const svgRef = useRef(null);
-  const simRef = useRef(null);
-  const [selectedNode, setSelectedNode] = useState(null);
+  const containerRef = useRef(null);
+  const [pos, setPos] = useState({
+    ph:        {x:175, y:100}, db:       {x:790, y:100},
+    sh:        {x:110, y:250}, hartwell: {x:250, y:195},
+    jw:        {x:480, y:200}, whitfield:{x:730, y:210},
+    mr:        {x:710, y:340}, dc:       {x:640, y:430},
+    hjv:       {x:480, y:390},
+    'exh-001': {x:310, y:470}, 'exh-002':{x:145, y:530},
+    'exh-003': {x:650, y:530}, 'exh-004':{x:800, y:440},
+    'exh-005': {x:820, y:540},
+    wi_h2:     {x:890, y:175}, cascade:  {x:890, y:265}, tridelta:{x:890, y:355}
+  });
+  const [drag, setDrag]         = useState(null);
+  const [pan, setPan]           = useState({x:40, y:30});
+  const [scale, setScale]       = useState(0.88);
+  const [panDrag, setPanDrag]   = useState(null);
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    const d3 = window.d3;
-    if (!d3) return;
-    let rafId;
-    const init = () => {
-      const svgEl = svgRef.current;
-      if (!svgEl) return;
-      const W = svgEl.clientWidth || 640;
-      const H = svgEl.clientHeight || 480;
-      const nodes = RELATIONSHIP_DATA.nodes.map(n => ({ ...n }));
-      const links = RELATIONSHIP_DATA.edges.map(e => ({ ...e }));
-
-      d3.select(svgEl).selectAll('*').remove();
-      const svg = d3.select(svgEl).attr('width', W).attr('height', H);
-
-      const zoomH = d3.zoom().scaleExtent([0.25, 4])
-        .on('zoom', (ev) => g.attr('transform', ev.transform));
-      svg.call(zoomH);
-      svg.on('click', () => setSelectedNode(null));
-
-      const g = svg.append('g');
-
-      const sim = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(115))
-        .force('charge', d3.forceManyBody().strength(-400))
-        .force('center', d3.forceCenter(W / 2, H / 2))
-        .force('collision', d3.forceCollide().radius(54));
-      simRef.current = sim;
-
-      const link = g.append('g').selectAll('line').data(links).join('line')
-        .attr('stroke', d => d.contradiction ? '#DC2626' : '#C4B5A2')
-        .attr('stroke-width', d => d.contradiction ? 1.5 : 1)
-        .attr('stroke-dasharray', d => d.contradiction ? '5,4' : null)
-        .attr('opacity', d => d.contradiction ? 0.8 : 0.5);
-
-      const linkLabel = g.append('g').selectAll('text').data(links).join('text')
-        .attr('font-size', 7).attr('fill', d => d.contradiction ? '#DC2626' : '#B5B0AB')
-        .attr('text-anchor', 'middle').attr('font-family', 'Inter, sans-serif')
-        .text(d => d.label);
-
-      const nodeG = g.append('g').selectAll('g').data(nodes).join('g')
-        .attr('cursor', 'pointer')
-        .on('click', (ev, d) => { ev.stopPropagation(); setSelectedNode({ ...d }); })
-        .call(d3.drag()
-          .on('start', (ev, d) => { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-          .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
-          .on('end',   (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
-        );
-
-      nodeG.each(function(d) {
-        const sel = d3.select(this);
-        if (d.type === 'exhibit') {
-          const s = 20;
-          sel.append('rect').attr('width', s*2).attr('height', s*2).attr('x', -s).attr('y', -s).attr('rx', 3)
-            .attr('transform', 'rotate(45)')
-            .attr('fill', d.contradiction ? '#FEF2F2' : '#EEE9E2')
-            .attr('stroke', d.contradiction ? '#DC2626' : '#C4B5A2')
-            .attr('stroke-width', d.contradiction ? 1.5 : 1)
-            .attr('stroke-dasharray', d.contradiction ? '4,3' : null);
-        } else if (d.type === 'org') {
-          const [w, h] = d.small ? [68, 24] : [86, 28];
-          sel.append('rect').attr('width', w).attr('height', h).attr('x', -w/2).attr('y', -h/2).attr('rx', 6)
-            .attr('fill', '#EEE9E2').attr('stroke', '#C4B5A2').attr('stroke-width', 1);
-        } else {
-          const r = d.role === 'deponent' ? 26 : 20;
-          const fills = { deponent: '#14110D', 'plaintiff-counsel': '#7A2E20', 'defense-counsel': '#1D4E89', party: '#3D6B2E', associated: '#EEE9E2' };
-          sel.append('circle').attr('r', r).attr('fill', fills[d.role] || '#EEE9E2').attr('stroke', '#C4B5A2').attr('stroke-width', 1);
-          if (d.initials) {
-            sel.append('text').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-              .attr('font-size', d.role === 'deponent' ? 10 : 8).attr('font-weight', '600')
-              .attr('font-family', 'Inter, sans-serif')
-              .attr('fill', ['deponent','plaintiff-counsel','defense-counsel','party'].includes(d.role) ? 'white' : '#14110D')
-              .text(d.initials);
-          }
-        }
-        const yLabel = d.type === 'exhibit' ? 37 : d.type === 'org' ? (d.small ? 19 : 22) : (d.role === 'deponent' ? 35 : 29);
-        sel.append('text').attr('text-anchor', 'middle').attr('y', yLabel)
-          .attr('font-size', d.small ? 8 : 9).attr('fill', '#14110D')
-          .attr('font-family', 'Inter, sans-serif').attr('font-weight', '500').text(d.label);
-        sel.append('text').attr('text-anchor', 'middle').attr('y', yLabel + 11)
-          .attr('font-size', 8).attr('fill', d.contradiction ? '#DC2626' : '#9A8573')
-          .attr('font-family', 'Inter, sans-serif').text(d.sub || '');
-      });
-
-      sim.on('tick', () => {
-        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-        linkLabel.attr('x', d => (d.source.x + d.target.x) / 2)
-                 .attr('y', d => (d.source.y + d.target.y) / 2 - 5);
-        nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.12 : 0.88;
+      const r = el.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      setScale(s => {
+        const ns = Math.min(3, Math.max(0.25, s * factor));
+        setPan(p => ({ x: mx - (mx - p.x) * (ns / s), y: my - (my - p.y) * (ns / s) }));
+        return ns;
       });
     };
-    rafId = requestAnimationFrame(init);
-    return () => { cancelAnimationFrame(rafId); simRef.current?.stop(); };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
+  const toCanvas = (ex, ey) => {
+    const r = containerRef.current.getBoundingClientRect();
+    return { x: (ex - r.left - pan.x) / scale, y: (ey - r.top - pan.y) / scale };
+  };
+
+  const onNodeDown = (e, id) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const c = toCanvas(e.clientX, e.clientY);
+    setDrag({ id, ox: c.x - pos[id].x, oy: c.y - pos[id].y });
+    setSelected(id);
+  };
+
+  const onBgDown = (e) => {
+    setPanDrag({ sx: e.clientX, sy: e.clientY, px: pan.x, py: pan.y });
+    setSelected(null);
+  };
+
+  const onMove = (e) => {
+    if (drag) {
+      const c = toCanvas(e.clientX, e.clientY);
+      setPos(p => ({ ...p, [drag.id]: { x: c.x - drag.ox, y: c.y - drag.oy } }));
+    } else if (panDrag) {
+      setPan({ x: panDrag.px + e.clientX - panDrag.sx, y: panDrag.py + e.clientY - panDrag.sy });
+    }
+  };
+
+  const onUp = () => { setDrag(null); setPanDrag(null); };
+
+  const nConf = (node) => {
+    if (node.type === 'exhibit' && node.contradiction) return { w:104, h:54, bg:'#FEF2F2', border:'#DC2626', text:'#7F1D1D', accent:'#DC2626' };
+    if (node.type === 'exhibit') return { w:104, h:54, bg:'#F5F3EF', border:'#C4B5A2', text:'#4A3828', accent:'#9A8573' };
+    if (node.type === 'org' && node.small) return { w:102, h:34, bg:'#F5F4F2', border:'#D0CAC3', text:'#6B5744', accent:'#9A8573' };
+    if (node.type === 'org') return { w:124, h:42, bg:'#EDEAE5', border:'#C4B5A2', text:'#3D2E1E', accent:'#6B5744' };
+    if (node.role === 'deponent') return { w:118, h:66, bg:'#14110D', border:'#14110D', text:'#FFFFFF', accent:'rgba(255,255,255,0.22)' };
+    if (node.role === 'plaintiff-counsel') return { w:112, h:58, bg:'#FFF5F5', border:'#C9524A', text:'#7A2E20', accent:'#DC2626' };
+    if (node.role === 'defense-counsel') return { w:112, h:58, bg:'#EFF6FF', border:'#2D5EA8', text:'#1D4E89', accent:'#2563EB' };
+    if (node.role === 'party') return { w:112, h:58, bg:'#F0FDF4', border:'#4A7C3F', text:'#3D6B2E', accent:'#22C55E' };
+    return { w:106, h:52, bg:'#F8F8F7', border:'#C4B5A2', text:'#4A3828', accent:'#9A8573' };
+  };
+
+  const eNodes = (e) => ({
+    src: typeof e.source === 'object' ? e.source.id : e.source,
+    tgt: typeof e.target === 'object' ? e.target.id : e.target
+  });
+
+  const selNode = selected ? RELATIONSHIP_DATA.nodes.find(n => n.id === selected) : null;
+
   return (
-    <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <svg ref={svgRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'block' }}/>
-        {/* Legend */}
-        <div style={{ position: 'absolute', bottom: 12, left: 12 }}
-          className="bg-white/90 border border-[#E2E1DF] rounded-lg px-3 py-2 text-[10px] text-[#6B5744] space-y-1.5">
-          <div className="flex items-center gap-1.5"><span style={{ width: 14, borderTop: '1px solid #C4B5A2', display: 'block' }}/><span>Relationship</span></div>
-          <div className="flex items-center gap-1.5"><span style={{ width: 14, borderTop: '2px dashed #DC2626', display: 'block' }}/><span className="text-rose-600 font-medium">Contradicts</span></div>
-          <div className="flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: '50%', background: '#14110D', display: 'inline-block' }}/><span>Deponent</span></div>
-          <div className="flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: '50%', background: '#7A2E20', display: 'inline-block' }}/><span>Plaintiff Counsel</span></div>
-          <div className="flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: '50%', background: '#1D4E89', display: 'inline-block' }}/><span>Defense Counsel</span></div>
-          <div className="flex items-center gap-1.5"><span style={{ width: 14, height: 9, borderRadius: 3, background: '#EEE9E2', border: '1px solid #C4B5A2', display: 'inline-block' }}/><span>Organization</span></div>
+    <div style={{ flex:1, display:'flex', minHeight:0, overflow:'hidden' }}>
+      {/* Whiteboard canvas */}
+      <div ref={containerRef}
+        style={{ flex:1, position:'relative', overflow:'hidden', background:'#FAFAF9',
+          cursor: (drag || panDrag) ? 'grabbing' : 'default' }}
+        onMouseDown={onBgDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}>
+        <svg style={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', display:'block' }}>
+          <defs>
+            <pattern id="wbDots"
+              x={pan.x % (16 * scale)} y={pan.y % (16 * scale)}
+              width={16 * scale} height={16 * scale} patternUnits="userSpaceOnUse">
+              <circle cx={8 * scale} cy={8 * scale} r={0.85} fill="#D0CAC3"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#wbDots)"/>
+          <g transform={`translate(${pan.x},${pan.y}) scale(${scale})`}>
+            {/* Edges */}
+            {RELATIONSHIP_DATA.edges.map((e, i) => {
+              const { src, tgt } = eNodes(e);
+              const sp = pos[src], tp = pos[tgt];
+              if (!sp || !tp) return null;
+              const mx = (sp.x + tp.x) / 2, my = (sp.y + tp.y) / 2;
+              return (
+                <g key={i}>
+                  <line x1={sp.x} y1={sp.y} x2={tp.x} y2={tp.y}
+                    stroke={e.contradiction ? '#DC2626' : '#C4B5A2'}
+                    strokeWidth={e.contradiction ? 1.5 : 1}
+                    strokeDasharray={e.contradiction ? '6,4' : undefined}
+                    opacity={e.contradiction ? 0.8 : 0.4}/>
+                  {e.label && (
+                    <g>
+                      <rect x={mx - 26} y={my - 8} width={52} height={14} rx={4}
+                        fill={e.contradiction ? '#FEF2F2' : '#F0EDE8'}
+                        stroke={e.contradiction ? '#FECACA' : '#E2E1DF'} strokeWidth={0.75}/>
+                      <text x={mx} y={my + 2.5} textAnchor="middle" fontSize={7.5}
+                        fill={e.contradiction ? '#DC2626' : '#9A8573'}
+                        fontFamily="Inter, sans-serif">{e.label}</text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+            {/* Nodes */}
+            {RELATIONSHIP_DATA.nodes.map(node => {
+              const p = pos[node.id];
+              if (!p) return null;
+              const c = nConf(node);
+              const isSel = selected === node.id;
+              const hw = c.w / 2, hh = c.h / 2;
+              const isPerson = node.initials && node.type !== 'org' && node.type !== 'exhibit';
+              return (
+                <g key={node.id} transform={`translate(${p.x},${p.y})`}
+                  onMouseDown={ev => onNodeDown(ev, node.id)}
+                  style={{ cursor:'grab', userSelect:'none' }}>
+                  <rect x={-hw} y={-hh} width={c.w} height={c.h} rx={7}
+                    fill={c.bg} stroke={isSel ? '#7A2E20' : c.border}
+                    strokeWidth={isSel ? 2 : 1}
+                    style={{ filter: isSel
+                      ? 'drop-shadow(0 4px 12px rgba(0,0,0,0.24))'
+                      : 'drop-shadow(0 2px 5px rgba(0,0,0,0.09))' }}/>
+                  {node.type === 'exhibit' && node.contradiction && (
+                    <rect x={-hw} y={-hh} width={4} height={c.h} rx={3} fill="#DC2626"/>
+                  )}
+                  {isPerson && (
+                    <circle cx={0} cy={-hh + 18} r={12} fill={c.accent}/>
+                  )}
+                  {isPerson && (
+                    <text x={0} y={-hh + 22} textAnchor="middle"
+                      fontSize={8} fontWeight="700" fill={c.text}
+                      fontFamily="Inter, sans-serif">{node.initials}</text>
+                  )}
+                  <text x={0}
+                    y={isPerson ? hh - 19 : node.type === 'org' ? 4 : 2}
+                    textAnchor="middle" fontSize={node.small ? 9 : 10} fontWeight="600"
+                    fill={c.text} fontFamily="Inter, sans-serif">{node.label}</text>
+                  {node.sub && (
+                    <text x={0}
+                      y={isPerson ? hh - 7 : node.type === 'org' ? 15 : 14}
+                      textAnchor="middle" fontSize={7.5}
+                      fill={node.contradiction ? '#DC2626' : c.accent}
+                      fontFamily="Inter, sans-serif">{node.sub}</text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+
+        {/* Zoom controls */}
+        <div style={{ position:'absolute', top:12, right:12, display:'flex', flexDirection:'column', gap:4 }}>
+          {[
+            { lbl:'+', fn: () => setScale(s => Math.min(3, s * 1.2)) },
+            { lbl:'−', fn: () => setScale(s => Math.max(0.25, s / 1.2)) },
+            { lbl:'⊡', fn: () => { setScale(0.88); setPan({x:40, y:30}); } }
+          ].map(({ lbl, fn }) => (
+            <button key={lbl} onClick={fn} onMouseDown={e => e.stopPropagation()}
+              style={{ width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center',
+                borderRadius:6, background:'#FFFFFF', border:'1px solid #E2E1DF', fontSize: lbl === '⊡' ? 13 : 17,
+                color:'#4A3828', cursor:'pointer', boxShadow:'0 1px 3px rgba(0,0,0,0.08)', lineHeight:1 }}>
+              {lbl}
+            </button>
+          ))}
         </div>
-        <div style={{ position: 'absolute', top: 10, right: 10 }}
-          className="text-[10px] text-[#9A8573] bg-white/80 rounded-md px-2 py-1 border border-[#E2E1DF]">
-          Drag · Scroll to zoom · Click node
+
+        {/* Hint */}
+        <div style={{ position:'absolute', top:12, left:'50%', transform:'translateX(-50%)',
+          fontSize:10, color:'#9A8573', background:'rgba(255,255,255,0.85)', borderRadius:6,
+          padding:'3px 10px', border:'1px solid #E2E1DF', pointerEvents:'none', userSelect:'none', whiteSpace:'nowrap' }}>
+          Drag nodes · Drag background to pan · Scroll to zoom
+        </div>
+
+        {/* Legend */}
+        <div style={{ position:'absolute', bottom:12, left:12, background:'rgba(255,255,255,0.92)',
+          border:'1px solid #E2E1DF', borderRadius:8, padding:'8px 12px', fontSize:10, color:'#6B5744' }}>
+          {[
+            { line: true, stroke:'#C4B5A2', dash: false, label:'Relationship' },
+            { line: true, stroke:'#DC2626', dash: true,  label:'Contradicts', color:'#DC2626' },
+            { swatch:'#14110D', label:'Deponent' },
+            { swatch:'#FFF5F5', bd:'1.5px solid #C9524A', label:'Plaintiff Counsel' },
+            { swatch:'#EFF6FF', bd:'1.5px solid #2D5EA8', label:'Defense Counsel' },
+            { swatch:'#EDEAE5', bd:'1px solid #C4B5A2',  label:'Organization' }
+          ].map(({ line, stroke, dash, swatch, bd, label, color }) => (
+            <div key={label} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
+              {line
+                ? <span style={{ width:14, display:'block',
+                    borderTop: dash ? `2px dashed ${stroke}` : `1px solid ${stroke}` }}/>
+                : <span style={{ width:28, height:13, borderRadius:3, background:swatch,
+                    border: bd, display:'inline-block', flexShrink:0 }}/>}
+              <span style={color ? { color, fontWeight:500 } : {}}>{label}</span>
+            </div>
+          ))}
         </div>
       </div>
-      {selectedNode && (
-        <div style={{ width: 228, flexShrink: 0 }} className="border-l border-[#E2E1DF] overflow-y-auto bg-[#F8F8F7]">
-          <div className="flex items-center justify-between px-4 pt-3.5 pb-1">
-            <span className="text-[13px] font-semibold text-[#14110D]">{selectedNode.label}</span>
-            <button onClick={() => setSelectedNode(null)} className="w-6 h-6 flex items-center justify-center rounded text-[#9A8573] hover:bg-[#E9E8E7] transition-colors"><Ic.x size={11}/></button>
+
+      {/* Detail panel */}
+      {selNode && (
+        <div style={{ width:228, flexShrink:0, borderLeft:'1px solid #E2E1DF',
+          overflowY:'auto', background:'#F8F8F7' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+            padding:'14px 16px 4px' }}>
+            <span style={{ fontSize:13, fontWeight:600, color:'#14110D' }}>{selNode.label}</span>
+            <button onClick={() => setSelected(null)}
+              style={{ width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center',
+                borderRadius:4, background:'none', border:'none', cursor:'pointer', color:'#9A8573' }}>
+              <Ic.x size={11}/>
+            </button>
           </div>
-          {selectedNode.sub && <p className="text-[11px] text-[#9A8573] px-4 pb-2">{selectedNode.sub}</p>}
-          <div className="px-4 pb-3 border-t border-[#E2E1DF] pt-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-[#9A8573] mb-2">Connections</p>
-            <div className="flex flex-col gap-1.5">
+          {selNode.sub && (
+            <p style={{ fontSize:11, color:'#9A8573', margin:'0 0 8px', padding:'0 16px' }}>
+              {selNode.sub}
+            </p>
+          )}
+          <div style={{ padding:'12px 16px', borderTop:'1px solid #E2E1DF' }}>
+            <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase',
+              letterSpacing:'0.1em', color:'#9A8573', marginBottom:8 }}>Connections</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               {RELATIONSHIP_DATA.edges
-                .filter(e => e.source === selectedNode.id || e.target === selectedNode.id)
+                .filter(e => { const {src,tgt} = eNodes(e); return src === selNode.id || tgt === selNode.id; })
                 .map((e, i) => {
-                  const otherId = e.source === selectedNode.id ? e.target : e.source;
+                  const { src, tgt } = eNodes(e);
+                  const otherId = src === selNode.id ? tgt : src;
                   const other = RELATIONSHIP_DATA.nodes.find(n => n.id === otherId);
                   return (
-                    <div key={i} className={cls('text-[11px] rounded-md px-2.5 py-1.5 flex items-center gap-1.5', e.contradiction ? 'bg-rose-50 text-rose-700' : 'bg-[#F0EDE8] text-[#4A3828]')}>
-                      <span className="font-medium shrink-0">{e.label}</span>
-                      <Ic.chevR size={9} className="shrink-0 opacity-40"/>
-                      <span className="truncate">{other?.label || otherId}</span>
+                    <div key={i} style={{ fontSize:11, borderRadius:6, padding:'6px 10px',
+                      display:'flex', alignItems:'center', gap:6,
+                      background: e.contradiction ? '#FEF2F2' : '#F0EDE8',
+                      color: e.contradiction ? '#B91C1C' : '#4A3828' }}>
+                      <span style={{ fontWeight:500, flexShrink:0 }}>{e.label}</span>
+                      <Ic.chevR size={9} style={{ flexShrink:0, opacity:0.4 }}/>
+                      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {other?.label || otherId}
+                      </span>
                     </div>
                   );
                 })}
             </div>
           </div>
-          {EXHIBIT_REFS[selectedNode.id] && (
-            <div className="px-4 pb-4 border-t border-[#E2E1DF] pt-3">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#9A8573] mb-2">Transcript Citations</p>
-              <div className="flex flex-col gap-2">
-                {EXHIBIT_REFS[selectedNode.id].map((r, i) => (
-                  <div key={i} className="bg-white border border-[#E2E1DF] rounded-lg px-3 py-2">
-                    <p className="font-mono text-[9px] text-[#9A8573] mb-1">{r.ref}</p>
-                    <p className="text-[11px] text-[#4A3828] leading-relaxed italic">{r.text}</p>
+          {EXHIBIT_REFS[selNode.id] && (
+            <div style={{ padding:'12px 16px 16px', borderTop:'1px solid #E2E1DF' }}>
+              <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase',
+                letterSpacing:'0.1em', color:'#9A8573', marginBottom:8 }}>Transcript Citations</p>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {EXHIBIT_REFS[selNode.id].map((r, i) => (
+                  <div key={i} style={{ background:'#FFFFFF', border:'1px solid #E2E1DF',
+                    borderRadius:8, padding:'8px 12px' }}>
+                    <p style={{ fontFamily:'JetBrains Mono, monospace', fontSize:9,
+                      color:'#9A8573', marginBottom:4 }}>{r.ref}</p>
+                    <p style={{ fontSize:11, color:'#4A3828', lineHeight:1.5, fontStyle:'italic' }}>
+                      {r.text}
+                    </p>
                   </div>
                 ))}
               </div>
