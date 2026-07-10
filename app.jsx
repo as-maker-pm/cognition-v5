@@ -1530,12 +1530,391 @@ function CaseChatPanel({ selectedCase }) {
   );
 }
 
+// ---------- Case-Level Data ----------
+const CASE_WITNESSES_INFO = {
+  'depo-001': { name: 'Sarah Chen',      short: 'S. Chen',     initials: 'SC', color: '#7A2E20', bg: '#FFF5F5', role: 'Sr. Project Manager', depoDate: 'Jun 3, 2024' },
+  'depo-007': { name: 'Robert Martinez', short: 'R. Martinez', initials: 'RM', color: '#1D4E89', bg: '#EFF6FF', role: 'HR Director',          depoDate: 'May 20, 2024' },
+  'depo-008': { name: 'Lisa Anderson',   short: 'L. Anderson', initials: 'LA', color: '#3D6B2E', bg: '#F0FDF4', role: 'VP Operations',        depoDate: 'Apr 10, 2024' },
+};
+
+const CASE_TIMELINE_EVENTS = [
+  { id:'ev1', witness:'depo-001', date:'2023-01-15', time:'10:00 AM', category:'document', title:'Employment Contract Signed',       contradiction:false, description:'Chen signed employment agreement with TechCorp as Senior PM. Contract includes Section 7 non-compete. Chen later claims limited knowledge of specific provisions.' },
+  { id:'ev2', witness:'depo-001', date:'2024-01-01', time:null,       category:'document', title:'2024 Compensation Amendment',      contradiction:false, description:'Annual compensation set at $185,000. Chen confirms signing the amendment but states she "signed many documents that day."' },
+  { id:'ev3', witness:'depo-001', date:'2024-06-03', time:'9:00 AM',  category:'action',   title:'Arrival Time — Chen Testimony',   contradiction:true,  description:'Chen testified arriving "around 9 AM," later revised to "closer to 9:15" under cross-examination.',   contradictionDetails:'Badge records (Exhibit E) show entry at 9:03 AM. Her revised 9:15 estimate is inconsistent with that record.' },
+  { id:'ev4', witness:'depo-001', date:'2024-06-03', time:'9:30 AM',  category:'meeting',  title:'Team Standup Meeting',            contradiction:false, description:'Weekly project standup. Chen was confident and consistent about this portion of her timeline.' },
+  { id:'ev5', witness:'depo-001', date:'2024-06-03', time:'2:00 PM',  category:'meeting',  title:'2PM Meeting — Chen Testimony',   contradiction:true,  description:'Chen testified the meeting "started a bit late, around 2:15." She confirmed attendance but showed notable nervousness.',  contradictionDetails:'Calendar and Anderson testimony confirm start at 2:02 PM — a 13-minute discrepancy.' },
+  { id:'ev6', witness:'depo-001', date:'2024-06-03', time:'4:30 PM',  category:'action',   title:'Section 7 Legal Review Email',   contradiction:true,  description:'Chen forwarded Section 7 to outside counsel for review on the same day she claimed limited familiarity with its contents.',  contradictionDetails:'Exhibit F shows she initiated legal review of the exact clause she claimed not to recall (Section 7).' },
+  { id:'rm1', witness:'depo-007', date:'2023-01-15', time:'10:00 AM', category:'record',   title:'Contract Signing — HR Confirms', contradiction:true,  description:'HR Director confirms employees received verbal briefing on Section 7 non-compete at time of signing.',  contradictionDetails:'Martinez states all employees were explicitly informed. Chen claimed unfamiliarity with Section 7 specifics.' },
+  { id:'rm2', witness:'depo-007', date:'2024-04-12', time:'2:30 PM',  category:'meeting',  title:'Mandatory Compliance Session',   contradiction:false, description:'HR-led compliance meeting attended by all department heads including Chen. Non-compete obligations and breach consequences explicitly covered. Martinez holds signed attendance sheet.' },
+  { id:'rm3', witness:'depo-007', date:'2024-06-03', time:'9:03 AM',  category:'record',   title:'Badge Entry — Confirmed 9:03 AM', contradiction:true,  description:'HR badge access logs show Chen entered at 9:03 AM. Martinez produced Exhibit E in support.',  contradictionDetails:'Chen revised arrival estimate to "closer to 9:15." Badge records definitively place entry at 9:03 AM.' },
+  { id:'la1', witness:'depo-008', date:'2024-05-15', time:'3:00 PM',  category:'document', title:'Contract Compliance Notice',      contradiction:false, description:'VP Operations confirms all department heads, including Chen, received formal written notice reiterating contractual obligations — one month before the disputed events.' },
+  { id:'la2', witness:'depo-008', date:'2024-06-03', time:'2:02 PM',  category:'meeting',  title:'2PM Meeting — Confirmed 2:02 PM', contradiction:true,  description:'Anderson confirms meeting began at 2:02 PM per calendar system and her own recollection. All attendees including Chen present from the start.',  contradictionDetails:'Chen placed the start "around 2:15." Anderson corroborated by Exhibits B and C — 13-minute discrepancy.' },
+  { id:'la3', witness:'depo-008', date:'2024-06-03', time:'4:30 PM',  category:'action',   title:'Post-Meeting Document Distribution', contradiction:false, description:'Anderson confirms contract documents distributed to all attendees after the 2PM session, including the amendment Chen later claimed was unfamiliar.' },
+];
+
+const CASE_MAP_DATA = {
+  nodes: [
+    { id:'sc',   type:'person',  role:'deponent',          label:'Sarah Chen',       sub:'Deponent · Sr. PM',   initials:'SC' },
+    { id:'rm',   type:'person',  role:'deponent-b',        label:'R. Martinez',      sub:'Deponent · HR Dir.',  initials:'RM' },
+    { id:'la',   type:'person',  role:'deponent-c',        label:'L. Anderson',      sub:'Deponent · VP Ops',   initials:'LA' },
+    { id:'pcv',  type:'person',  role:'plaintiff-counsel', label:'Plaintiff Counsel',sub:'Employee-Side',        initials:'PC' },
+    { id:'dcv',  type:'person',  role:'defense-counsel',   label:'Defense Counsel',  sub:'TechCorp-Side',        initials:'DC' },
+    { id:'tc',   type:'org',                               label:'TechCorp Inc.',    sub:'Defendant' },
+    { id:'olc',  type:'org',     small:true,               label:'Outside Counsel',  sub:'Consulted Jun 3' },
+    { id:'sec7', type:'org',     small:true,               label:'Section 7',        sub:'Non-Compete Clause' },
+    { id:'cxa',  type:'exhibit',                           label:'EXHIBIT A',        sub:'Employment Contract' },
+    { id:'cxe',  type:'exhibit', contradiction:true,       label:'EXHIBIT E',        sub:'Badge Records' },
+    { id:'cxbc', type:'exhibit', contradiction:true,       label:'EXHIBIT B/C',      sub:'Calendar + Attendance' },
+    { id:'cxf',  type:'exhibit', contradiction:true,       label:'EXHIBIT F',        sub:'Email Thread Jun 3' },
+  ],
+  edges: [
+    { source:'sc',  target:'tc',   label:'employed by',      contradiction:false },
+    { source:'rm',  target:'tc',   label:'HR Director',      contradiction:false },
+    { source:'la',  target:'tc',   label:'VP Operations',    contradiction:false },
+    { source:'pcv', target:'sc',   label:'represents',       contradiction:false },
+    { source:'dcv', target:'tc',   label:'represents',       contradiction:false },
+    { source:'sc',  target:'cxa',  label:'signed',           contradiction:false },
+    { source:'sc',  target:'sec7', label:'claimed ignorance',contradiction:true  },
+    { source:'rm',  target:'sec7', label:'briefed all staff',contradiction:false },
+    { source:'sc',  target:'cxe',  label:'contradicts',      contradiction:true  },
+    { source:'rm',  target:'cxe',  label:'confirms',         contradiction:false },
+    { source:'sc',  target:'cxbc', label:'contradicts',      contradiction:true  },
+    { source:'la',  target:'cxbc', label:'confirms',         contradiction:false },
+    { source:'sc',  target:'cxf',  label:'sent email',       contradiction:true  },
+    { source:'sc',  target:'olc',  label:'consulted Jun 3',  contradiction:false },
+    { source:'rm',  target:'la',   label:'corroborates',     contradiction:false },
+  ],
+};
+
+// ---------- Case Level Timeline ----------
+function CaseLevelTimeline() {
+  const [filter, setFilter] = useState(null);
+  const witnesses = Object.entries(CASE_WITNESSES_INFO).map(([id, w]) => ({ id, ...w }));
+
+  const events = CASE_TIMELINE_EVENTS.filter(ev => !filter || ev.witness === filter);
+  const sorted = [...events].sort((a, b) => {
+    const d = a.date.localeCompare(b.date);
+    return d !== 0 ? d : (a.time || '').localeCompare(b.time || '');
+  });
+  const grouped = sorted.reduce((acc, ev) => {
+    if (!acc[ev.date]) acc[ev.date] = [];
+    acc[ev.date].push(ev);
+    return acc;
+  }, {});
+  const fmtDate = (d) => {
+    const [y, m, day] = d.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+  };
+  const catIcon = (cat) => cat === 'document' ? <Ic.fileText size={10}/> : cat === 'meeting' ? <Ic.calendar size={10}/> : <Ic.clock size={10}/>;
+  const contraCount = CASE_TIMELINE_EVENTS.filter(ev => ev.contradiction && (!filter || ev.witness === filter)).length;
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#F8F8F7]">
+      {/* Witness filter bar */}
+      <div className="px-6 py-3 border-b border-[#E2E1DF] flex items-center gap-3 shrink-0">
+        <span className="text-[11px] font-semibold text-[#9A8573] uppercase tracking-wider shrink-0">Filter by deponent</span>
+        <div className="flex items-center gap-2 flex-1">
+          <button onClick={() => setFilter(null)}
+            className={cls('text-[12px] px-3 py-1.5 rounded-full border transition-colors',
+              !filter ? 'bg-[#14110D] text-white border-[#14110D]' : 'border-[#E2E1DF] text-[#6B5744] hover:border-[#14110D]')}>
+            All witnesses
+          </button>
+          {witnesses.map(w => (
+            <button key={w.id} onClick={() => setFilter(w.id === filter ? null : w.id)}
+              style={{ borderColor: filter === w.id ? w.color : undefined, background: filter === w.id ? w.bg : undefined, color: filter === w.id ? w.color : undefined }}
+              className={cls('text-[12px] px-3 py-1.5 rounded-full border transition-colors',
+                filter === w.id ? 'font-semibold' : 'border-[#E2E1DF] text-[#6B5744] hover:border-[#9A8573]')}>
+              {w.short}
+            </button>
+          ))}
+        </div>
+        {contraCount > 0 && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1 shrink-0">
+            <Ic.alert size={11}/> {contraCount} cross-deposition conflict{contraCount > 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto py-5 px-6">
+        {Object.keys(grouped).map(date => (
+          <div key={date} className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-[#9A8573]">{fmtDate(date)}</span>
+              <div className="flex-1 h-px bg-[#E2E1DF]"/>
+              <span className="text-[10px] text-[#C4B5A2]">{grouped[date].length} event{grouped[date].length > 1 ? 's' : ''}</span>
+            </div>
+            <div className="relative pl-6 flex flex-col gap-3">
+              <div className="absolute left-[7px] top-3 bottom-3 w-px bg-[#E2E1DF]"/>
+              {grouped[date].map(ev => {
+                const w = CASE_WITNESSES_INFO[ev.witness];
+                return (
+                  <div key={ev.id} className="relative">
+                    <div className="absolute -left-[19px] top-4 w-3 h-3 rounded-full border-2 z-10"
+                      style={{ background: ev.contradiction ? '#DC2626' : w.color, borderColor: ev.contradiction ? '#DC2626' : w.color }}/>
+                    <div className={cls('rounded-xl px-4 py-3.5 border',
+                      ev.contradiction ? 'bg-[#FEF2F2] border-[#FECACA]' : 'bg-white border-[#E2E1DF]')}>
+                      <div className="flex items-start justify-between gap-3 mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          {ev.time && <div className="text-[10px] font-mono text-[#9A8573] mb-0.5">{ev.time}</div>}
+                          <div className="text-[13px] font-semibold text-[#14110D] leading-snug">{ev.title}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                          {ev.contradiction && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#DC2626] bg-[#FEE2E2] px-2 py-0.5 rounded-full whitespace-nowrap">
+                              <Ic.alert size={8}/> Conflict
+                            </span>
+                          )}
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ background: w.bg, color: w.color }}>
+                            <span style={{ width:12, height:12, borderRadius:'50%', background:w.color, color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:7, fontWeight:800, flexShrink:0 }}>{w.initials}</span>
+                            {w.short}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[12px] text-[#6B5744] leading-relaxed mb-2">{ev.description}</p>
+                      {ev.contradiction && ev.contradictionDetails && (
+                        <div className="mt-2 pt-2.5 border-t border-[#FECACA] flex items-start gap-2">
+                          <Ic.alert size={11} className="text-[#DC2626] mt-0.5 shrink-0"/>
+                          <p className="text-[11px] text-[#B91C1C] leading-relaxed">{ev.contradictionDetails}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Case Level Map ----------
+function CaseLevelMap() {
+  const { getRecord } = useVerifyCtx();
+  const containerRef = useRef(null);
+  const [pos, setPos] = useState({
+    sc:{x:320,y:110}, rm:{x:130,y:280}, la:{x:510,y:280},
+    pcv:{x:110,y:110}, dcv:{x:530,y:110},
+    tc:{x:320,y:270}, olc:{x:680,y:160}, sec7:{x:680,y:260},
+    cxa:{x:130,y:420}, cxe:{x:320,y:430}, cxbc:{x:480,y:430}, cxf:{x:640,y:390},
+  });
+  const [drag, setDrag] = useState(null);
+  const [pan, setPan] = useState({x:30, y:20});
+  const [scale, setScale] = useState(0.9);
+  const [panDrag, setPanDrag] = useState(null);
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const f = e.deltaY < 0 ? 1.12 : 0.88;
+      const r = el.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      setScale(s => {
+        const ns = Math.min(3, Math.max(0.25, s * f));
+        setPan(p => ({ x: mx - (mx - p.x) * (ns / s), y: my - (my - p.y) * (ns / s) }));
+        return ns;
+      });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const toCanvas = (ex, ey) => {
+    const r = containerRef.current.getBoundingClientRect();
+    return { x: (ex - r.left - pan.x) / scale, y: (ey - r.top - pan.y) / scale };
+  };
+  const onNodeDown = (e, id) => {
+    e.stopPropagation(); e.preventDefault();
+    const c = toCanvas(e.clientX, e.clientY);
+    setDrag({ id, ox: c.x - pos[id].x, oy: c.y - pos[id].y });
+    setSelected(id);
+  };
+  const onMove = (e) => {
+    if (drag) {
+      const c = toCanvas(e.clientX, e.clientY);
+      setPos(p => ({ ...p, [drag.id]: { x: c.x - drag.ox, y: c.y - drag.oy } }));
+    } else if (panDrag) {
+      setPan({ x: e.clientX - panDrag.ox, y: e.clientY - panDrag.oy });
+    }
+  };
+  const onUp = () => { setDrag(null); setPanDrag(null); };
+  const onBgDown = (e) => {
+    if (e.target === containerRef.current || e.target.tagName === 'svg' || e.target.tagName === 'rect') {
+      setPanDrag({ ox: e.clientX - pan.x, oy: e.clientY - pan.y });
+    }
+  };
+
+  const nConf = (node) => {
+    const r = node.role;
+    const sizes = node.type === 'exhibit' ? { w:84, h:44 } : node.small ? { w:86, h:44 } : node.type === 'org' ? { w:104, h:50 } : { w:104, h:56 };
+    if (r === 'deponent')          return { fill:'#14110D', stroke:'#14110D', text:'#FFFFFF', accent:'#9A8573', ...sizes };
+    if (r === 'deponent-b')        return { fill:'#1D4E89', stroke:'#1D4E89', text:'#FFFFFF', accent:'#93C5FD', ...sizes };
+    if (r === 'deponent-c')        return { fill:'#3D6B2E', stroke:'#3D6B2E', text:'#FFFFFF', accent:'#86EFAC', ...sizes };
+    if (r === 'plaintiff-counsel') return { fill:'#FFF5F5', stroke:'#C9524A', text:'#7A1A10', accent:'#C9524A', ...sizes };
+    if (r === 'defense-counsel')   return { fill:'#EFF6FF', stroke:'#2D5EA8', text:'#1A3A6B', accent:'#2D5EA8', ...sizes };
+    if (node.type === 'org')       return { fill:'#EDEAE5', stroke:'#C4B5A2', text:'#4A3828', accent:'#9A8573', ...sizes };
+    if (node.type === 'exhibit')   return { fill: node.contradiction ? '#FEF2F2' : '#F0F0EE', stroke: node.contradiction ? '#FECACA' : '#D0CAC3', text: node.contradiction ? '#7A1A10' : '#4A3828', accent: node.contradiction ? '#DC2626' : '#9A8573', ...sizes };
+    return { fill:'#F8F8F7', stroke:'#C4B5A2', text:'#4A3828', accent:'#9A8573', ...sizes };
+  };
+
+  const eNodes = (e) => ({ src: e.source, tgt: e.target });
+  const selNode = selected ? CASE_MAP_DATA.nodes.find(n => n.id === selected) : null;
+
+  return (
+    <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
+      <div ref={containerRef} style={{ flex:1, position:'relative', overflow:'hidden', cursor: drag ? 'grabbing' : 'grab', background:'#F8F8F7', userSelect:'none' }}
+        onMouseDown={onBgDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}>
+
+        {/* Dot grid */}
+        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none' }}>
+          <defs>
+            <pattern id="cmDots" x={pan.x % 24} y={pan.y % 24} width="24" height="24" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="1" fill="#D8D4CE"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#cmDots)"/>
+        </svg>
+
+        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', overflow:'visible', pointerEvents:'none' }}>
+          <g transform={`translate(${pan.x},${pan.y}) scale(${scale})`}>
+            {CASE_MAP_DATA.edges.map((e, i) => {
+              const sp = pos[e.source], tp = pos[e.target];
+              if (!sp || !tp) return null;
+              const sx = sp.x, sy = sp.y, tx = tp.x, ty = tp.y;
+              const mx = (sx + tx) / 2, my = (sy + ty) / 2;
+              return (
+                <g key={i} pointerEvents="none">
+                  <line x1={sx} y1={sy} x2={tx} y2={ty}
+                    stroke={e.contradiction ? '#DC2626' : '#C4B5A2'}
+                    strokeWidth={e.contradiction ? 1.5 : 1}
+                    strokeDasharray={e.contradiction ? '5,4' : 'none'}
+                    opacity={e.contradiction ? 0.7 : 0.5}/>
+                  <rect x={mx - e.label.length * 2.8} y={my - 7} width={e.label.length * 5.6} height={14}
+                    rx={4} fill="rgba(248,248,247,0.95)" stroke="#E2E1DF" strokeWidth={0.5}/>
+                  <text x={mx} y={my + 4} textAnchor="middle" fontSize={8} fill={e.contradiction ? '#DC2626' : '#9A8573'} fontFamily="Inter, sans-serif">{e.label}</text>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+
+        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', overflow:'visible' }}>
+          <g transform={`translate(${pan.x},${pan.y}) scale(${scale})`}>
+            {CASE_MAP_DATA.nodes.map(node => {
+              const p = pos[node.id];
+              if (!p) return null;
+              const c = nConf(node);
+              const hw = c.w / 2, hh = c.h / 2;
+              const isPerson = node.type === 'person';
+              const isSel = selected === node.id;
+              return (
+                <g key={node.id} transform={`translate(${p.x},${p.y})`}
+                  style={{ cursor:'grab' }} onMouseDown={(e) => onNodeDown(e, node.id)}>
+                  <rect x={-hw} y={-hh} width={c.w} height={c.h} rx={isPerson ? 12 : 8}
+                    fill={c.fill} stroke={isSel ? '#14110D' : c.stroke}
+                    strokeWidth={isSel ? 2.5 : (isPerson ? 1.5 : 1)}
+                    filter={isSel ? 'drop-shadow(0 2px 8px rgba(0,0,0,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.08))'}/>
+                  {isPerson && <circle cx={0} cy={-hh + 18} r={12} fill={c.accent}/>}
+                  {isPerson && <text x={0} y={-hh + 22} textAnchor="middle" fontSize={8} fontWeight="700" fill={c.text} fontFamily="Inter, sans-serif">{node.initials}</text>}
+                  <text x={0} y={isPerson ? hh - 19 : node.type === 'org' ? 4 : 2}
+                    textAnchor="middle" fontSize={node.small ? 9 : 10} fontWeight="600"
+                    fill={c.text} fontFamily="Inter, sans-serif">{node.label}</text>
+                  {node.sub && <text x={0} y={isPerson ? hh - 7 : node.type === 'org' ? 15 : 14}
+                    textAnchor="middle" fontSize={7.5}
+                    fill={node.contradiction ? '#DC2626' : c.accent}
+                    fontFamily="Inter, sans-serif">{node.sub}</text>}
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+
+        {/* Controls */}
+        <div style={{ position:'absolute', top:12, right:12, display:'flex', flexDirection:'column', gap:4 }}>
+          {[{lbl:'+',fn:()=>setScale(s=>Math.min(3,s*1.2))},{lbl:'−',fn:()=>setScale(s=>Math.max(0.25,s/1.2))},{lbl:'⊡',fn:()=>{setScale(0.9);setPan({x:30,y:20});}}].map(({lbl,fn})=>(
+            <button key={lbl} onClick={fn} onMouseDown={e=>e.stopPropagation()}
+              style={{width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:6,background:'#FFFFFF',border:'1px solid #E2E1DF',fontSize:lbl==='⊡'?13:17,color:'#4A3828',cursor:'pointer',boxShadow:'0 1px 3px rgba(0,0,0,0.08)',lineHeight:1}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+
+        {/* Legend */}
+        <div style={{position:'absolute',bottom:12,left:12,background:'rgba(255,255,255,0.92)',border:'1px solid #E2E1DF',borderRadius:8,padding:'8px 12px',fontSize:10,color:'#6B5744'}}>
+          {[
+            {swatch:'#14110D',label:'Sarah Chen (Deponent)'},
+            {swatch:'#1D4E89',label:'R. Martinez (Deponent)'},
+            {swatch:'#3D6B2E',label:'L. Anderson (Deponent)'},
+            {line:true,stroke:'#DC2626',dash:true,label:'Contradiction',color:'#DC2626'},
+            {line:true,stroke:'#C4B5A2',dash:false,label:'Relationship'},
+          ].map(({swatch,line,stroke,dash,bd,label,color})=>(
+            <div key={label} style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+              {line
+                ? <span style={{width:18,display:'block',borderTop:dash?`2px dashed ${stroke}`:`1.5px solid ${stroke}`}}/>
+                : <span style={{width:14,height:14,borderRadius:3,background:swatch,display:'inline-block',flexShrink:0}}/>}
+              <span style={color?{color,fontWeight:500}:{}}>{label}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{position:'absolute',top:12,left:'50%',transform:'translateX(-50%)',fontSize:10,color:'#9A8573',background:'rgba(255,255,255,0.85)',borderRadius:6,padding:'3px 10px',border:'1px solid #E2E1DF',pointerEvents:'none',userSelect:'none',whiteSpace:'nowrap'}}>
+          Drag nodes · Drag background to pan · Scroll to zoom
+        </div>
+      </div>
+
+      {/* Detail panel */}
+      {selNode && (
+        <div style={{width:220,flexShrink:0,borderLeft:'1px solid #E2E1DF',overflowY:'auto',background:'#F8F8F7'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 4px',gap:6}}>
+            <span style={{fontSize:13,fontWeight:600,color:'#14110D',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{selNode.label}</span>
+            <VerifyChip id={`case-map-${selNode.id}`} content={selNode.sub || selNode.label}/>
+            <button onClick={()=>setSelected(null)} style={{width:24,height:24,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:4,background:'none',border:'none',cursor:'pointer',color:'#9A8573',flexShrink:0}}>
+              <Ic.x size={11}/>
+            </button>
+          </div>
+          {selNode.sub && (()=>{
+            const rec = getRecord(`case-map-${selNode.id}`);
+            const disp = rec?.fixes?.slice(-1)[0]?.fixed || selNode.sub;
+            return <p style={{fontSize:11,color:'#9A8573',margin:'0 0 8px',padding:'0 16px'}}>{disp}</p>;
+          })()}
+          <div style={{padding:'12px 16px',borderTop:'1px solid #E2E1DF'}}>
+            <p style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:'#9A8573',marginBottom:8}}>Connections</p>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {CASE_MAP_DATA.edges
+                .filter(e=>e.source===selNode.id||e.target===selNode.id)
+                .map((e,i)=>{
+                  const otherId = e.source===selNode.id ? e.target : e.source;
+                  const other = CASE_MAP_DATA.nodes.find(n=>n.id===otherId);
+                  return (
+                    <div key={i} style={{fontSize:11,borderRadius:6,padding:'6px 10px',display:'flex',alignItems:'center',gap:6,
+                      background:e.contradiction?'#FEF2F2':'#F0EDE8',color:e.contradiction?'#B91C1C':'#4A3828'}}>
+                      <span style={{fontWeight:500,flexShrink:0}}>{e.label}</span>
+                      <Ic.chevR size={9} style={{flexShrink:0,opacity:0.4}}/>
+                      <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{other?.label||otherId}</span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- Deposition Library ----------
 function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
   const { user } = useAuth();
   const t = useToast();
   const canEdit = user?.role === 'admin' || user?.role === 'editor';
   const [view, setView] = useState('grid');
+  const [caseTab, setCaseTab] = useState('depositions');
   const selectedCase = MOCK_CASES.find((c) => c.id === caseId);
   const baseList = selectedCase ? MOCK_DEPOSITIONS.filter((d) => d.caseNumber === selectedCase.caseNumber) : MOCK_DEPOSITIONS;
   const [depos, setDepos] = useState(baseList);
@@ -1571,21 +1950,40 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
   return (
     <div className="flex-1 flex overflow-hidden">
       <div className="flex-1 flex flex-col bg-[#F8F8F7] overflow-hidden">
-        <div className="border-b border-[#E2E1DF] bg-[#F8F8F7] px-6 py-4 flex items-center justify-between gap-4 shrink-0">
-          <div>
+        <div className="border-b border-[#E2E1DF] bg-[#F8F8F7] px-6 py-3.5 flex items-center justify-between gap-4 shrink-0">
+          <div className="flex-1 min-w-0">
             <h1 className="text-xl font-semibold text-[#14110D] tracking-tight">{selectedCase?.caseName || 'Depositions'}</h1>
             {selectedCase && <p className="text-[11px] text-[#9A8573] font-mono">{selectedCase.caseNumber}</p>}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1 border border-[#E2E1DF] rounded-lg p-1 bg-[#F8F8F7]">
-              <Button variant={view === 'list' ? 'secondary' : 'ghost'} size="sm" onClick={() => setView('list')} className="h-9 w-9 p-0"><Ic.list size={18}/></Button>
-              <Button variant={view === 'grid' ? 'secondary' : 'ghost'} size="sm" onClick={() => setView('grid')} className="h-9 w-9 p-0"><Ic.grid size={18}/></Button>
-            </div>
-            <Button onClick={onAdd}><Ic.plus size={14}/> Add New</Button>
+          {/* Case-level tabs */}
+          <div className="flex items-center gap-1 bg-[#EDEAE5] rounded-lg p-1 shrink-0">
+            {[
+              { id:'depositions', label:'Depositions', icon: Ic.list },
+              { id:'timeline',    label:'Timeline',    icon: Ic.calendar },
+              { id:'map',         label:'Map',         icon: Ic.graph },
+            ].map(({ id, label, icon: Icon }) => (
+              <button key={id} onClick={() => setCaseTab(id)}
+                className={cls('flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] transition-colors',
+                  caseTab === id ? 'bg-white text-[#14110D] shadow-sm font-medium' : 'text-[#6B5744] hover:text-[#14110D]')}>
+                <Icon size={13}/>{label}
+              </button>
+            ))}
           </div>
+          {caseTab === 'depositions' && (
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1 border border-[#E2E1DF] rounded-lg p-1 bg-[#F8F8F7]">
+                <Button variant={view === 'list' ? 'secondary' : 'ghost'} size="sm" onClick={() => setView('list')} className="h-9 w-9 p-0"><Ic.list size={18}/></Button>
+                <Button variant={view === 'grid' ? 'secondary' : 'ghost'} size="sm" onClick={() => setView('grid')} className="h-9 w-9 p-0"><Ic.grid size={18}/></Button>
+              </div>
+              <Button onClick={onAdd}><Ic.plus size={14}/> Add New</Button>
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-auto p-6">
+        {caseTab === 'timeline' && <CaseLevelTimeline/>}
+        {caseTab === 'map'      && <CaseLevelMap/>}
+
+        {caseTab === 'depositions' && <div className="flex-1 overflow-auto p-6">
           {view === 'grid' ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {list.map((d) => (
@@ -1653,9 +2051,9 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
               ))}
             </div>
           )}
-        </div>
+        </div>}
       </div>
-      <CaseChatPanel selectedCase={selectedCase}/>
+      {caseTab === 'depositions' && <CaseChatPanel selectedCase={selectedCase}/>}
       {editDepo && (
         <EditDepositionModal d={editDepo} onClose={() => setEditDepo(null)}
           onSave={(updated) => { setDepos(ds => ds.map(x => x.id === updated.id ? updated : x)); setEditDepo(null); }}/>
