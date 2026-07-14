@@ -93,13 +93,13 @@ const useAuth = () => useContext(AuthCtx);
 const VerifyCtx = createContext(null);
 function VerifyProvider({ children }) {
   const [records, setRecords] = useState({});
-  const doVerify = (id, byName) => setRecords(r => ({
-    ...r, [id]: { ...(r[id] || { fixes:[] }), verified:true, by:byName, at:new Date().toISOString() }
-  }));
+  const doVerify = (id, byName) => setRecords(r => {
+    const prev = r[id] || { fixes:[], verifications:[] };
+    return { ...r, [id]: { ...prev, verifications:[...(prev.verifications||[]), { by:byName, at:new Date().toISOString() }] }};
+  });
   const doFix = (id, original, fixed, note, byName) => setRecords(r => {
-    const prev = r[id] || { fixes:[] };
-    return { ...r, [id]: { ...prev, verified:true, by:byName, at:new Date().toISOString(),
-      fixes:[...(prev.fixes||[]), { original, fixed, note, by:byName, at:new Date().toISOString() }] }};
+    const prev = r[id] || { fixes:[], verifications:[] };
+    return { ...r, [id]: { ...prev, fixes:[...(prev.fixes||[]), { original, fixed, note, by:byName, at:new Date().toISOString() }] }};
   });
   const getRecord = (id) => records[id] || null;
   return <VerifyCtx.Provider value={{ doVerify, doFix, getRecord }}>{children}</VerifyCtx.Provider>;
@@ -148,6 +148,7 @@ function VerifyChip({ id, content }) {
   const { doVerify, doFix, getRecord } = useVerifyCtx();
   const { user } = useAuth();
   const toast = useToast();
+  const canAct = user?.role === 'admin' || user?.role === 'editor';
   const record = getRecord(id);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mode, setMode] = useState(null);
@@ -179,8 +180,19 @@ function VerifyChip({ id, content }) {
     } catch { return ''; }
   };
 
-  const latestFix = record?.fixes?.slice(-1)[0];
   const byName = user?.name || user?.email || 'Team member';
+
+  // Derive state — comparison of latest fix vs latest verification timestamps
+  const fixes = record?.fixes || [];
+  const verifications = record?.verifications || [];
+  const latestFix = fixes[fixes.length - 1] || null;
+  const latestVerification = verifications[verifications.length - 1] || null;
+  const isVerified = !!(latestVerification && (!latestFix || latestVerification.at > latestFix.at));
+  const isEdited  = !!(latestFix && (!latestVerification || latestFix.at > latestVerification.at));
+  // Only verifications made AFTER the last edit count as "active"
+  const activeVerifications = latestFix
+    ? verifications.filter(v => v.at > latestFix.at)
+    : verifications;
 
   const handleDots = (e) => {
     e.stopPropagation();
@@ -193,7 +205,7 @@ function VerifyChip({ id, content }) {
     const r = btnRef.current?.getBoundingClientRect();
     if (r) setCoords(c => ({ ...c, form: { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) } }));
     setMode(prev => prev === m ? null : m);
-    if (m === 'fix') setFixText(content || '');
+    if (m === 'fix') setFixText(latestFix?.fixed || content || '');
     setMenuOpen(false);
   };
 
@@ -203,44 +215,72 @@ function VerifyChip({ id, content }) {
     setTipVisible(true);
   };
 
+  const verifyLabel = isVerified ? 'Add verification' : isEdited ? 'Verify this version' : 'Verify';
   const menuItems = [
-    { icon: <Ic.checkC size={13}/>, label: record?.verified ? 'Re-verify' : 'Verify',
-      action: () => { doVerify(id, byName); setMenuOpen(false); toast?.success('Verified', `Marked as verified by ${byName}`); } },
+    { icon: <Ic.checkC size={13}/>, label: verifyLabel,
+      action: () => { doVerify(id, byName); setMenuOpen(false); toast?.success('Verified', `${byName} added their verification`); } },
     { icon: <Ic.edit size={13}/>, label: 'Fix', action: () => openMode('fix') },
     { icon: <Ic.flag size={13}/>, label: 'Report issue', action: () => openMode('report') },
   ];
 
+  const badgeBase = { display:'inline-flex', alignItems:'center', gap:4, fontSize:9.5, fontWeight:600,
+    padding:'2px 7px', borderRadius:99, cursor:'default', userSelect:'none', whiteSpace:'nowrap' };
+
   return (
     <>
-      {/* Inline trigger — place inside header row */}
       <span style={{ display:'inline-flex', alignItems:'center', gap:3, flexShrink:0, lineHeight:1 }}>
-        {record?.verified && (
-          <span ref={badgeRef}
-            style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:9.5, fontWeight:600,
-              padding:'2px 7px', borderRadius:99, cursor:'default', userSelect:'none', whiteSpace:'nowrap',
-              background: latestFix ? '#EFF6FF' : '#F0FDF4',
-              border: `1px solid ${latestFix ? '#BFDBFE' : '#BBF7D0'}`,
-              color: latestFix ? '#1D4E89' : '#3D6B2E' }}
-            onMouseEnter={showTip} onMouseLeave={() => setTipVisible(false)}>
+        {/* Verified badge — green, shows stacked initials when multiple verifiers */}
+        {isVerified && (
+          <span ref={badgeRef} onMouseEnter={showTip} onMouseLeave={() => setTipVisible(false)}
+            style={{ ...badgeBase, background:'#F0FDF4', border:'1px solid #BBF7D0', color:'#3D6B2E' }}>
             <Ic.checkC size={9}/>
-            {latestFix ? 'Fixed' : 'Verified'}
+            Verified
+            {activeVerifications.length > 1 && (
+              <span style={{ display:'inline-flex', alignItems:'center', marginLeft:1 }}>
+                {activeVerifications.slice(0, 3).map((v, i) => (
+                  <span key={i} style={{ width:13, height:13, borderRadius:'50%', background:'#3D6B2E', color:'#fff',
+                    display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:7, fontWeight:800,
+                    marginLeft: i === 0 ? 0 : -3, border:'1.5px solid #F0FDF4', boxSizing:'border-box' }}>
+                    {(v.by||'?')[0].toUpperCase()}
+                  </span>
+                ))}
+                {activeVerifications.length > 3 && (
+                  <span style={{ width:13, height:13, borderRadius:'50%', background:'#9A8573', color:'#fff',
+                    display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:6, fontWeight:800,
+                    marginLeft:-3, border:'1.5px solid #F0FDF4', boxSizing:'border-box' }}>
+                    +{activeVerifications.length - 3}
+                  </span>
+                )}
+              </span>
+            )}
           </span>
         )}
-        <button ref={btnRef} onClick={handleDots}
-          style={{ width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center',
-            borderRadius:5, border:'none', background: menuOpen ? '#E9E8E7' : 'transparent',
-            cursor:'pointer', color: menuOpen ? '#6B5744' : '#C4B5A2', transition:'all 0.12s', padding:0 }}
-          onMouseEnter={e => { e.currentTarget.style.background='#E9E8E7'; e.currentTarget.style.color='#6B5744'; }}
-          onMouseLeave={e => { if (!menuOpen) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#C4B5A2'; } }}>
-          <Ic.more size={13}/>
-        </button>
+        {/* Edited badge — amber, indicates verification was voided by a fix */}
+        {isEdited && (
+          <span ref={badgeRef} onMouseEnter={showTip} onMouseLeave={() => setTipVisible(false)}
+            style={{ ...badgeBase, background:'#FFFBEB', border:'1px solid #FDE68A', color:'#92400E' }}>
+            <Ic.edit size={9}/>
+            Edited
+          </span>
+        )}
+        {/* Action dots — editors and admins only */}
+        {canAct && (
+          <button ref={btnRef} onClick={handleDots}
+            style={{ width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center',
+              borderRadius:5, border:'none', background: menuOpen ? '#E9E8E7' : 'transparent',
+              cursor:'pointer', color: menuOpen ? '#6B5744' : '#C4B5A2', transition:'all 0.12s', padding:0 }}
+            onMouseEnter={e => { e.currentTarget.style.background='#E9E8E7'; e.currentTarget.style.color='#6B5744'; }}
+            onMouseLeave={e => { if (!menuOpen) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#C4B5A2'; } }}>
+            <Ic.more size={13}/>
+          </button>
+        )}
       </span>
 
-      {/* Dropdown — portaled to body */}
+      {/* Dropdown */}
       {menuOpen && coords.menu && ReactDOM.createPortal(
         <div ref={menuRef} style={{ position:'fixed', top:coords.menu.top, left:coords.menu.left, zIndex:1000,
           background:'#F8F8F7', border:'1px solid #E2E1DF', borderRadius:8,
-          boxShadow:'0 4px 18px rgba(0,0,0,0.14)', padding:4, minWidth:154 }}>
+          boxShadow:'0 4px 18px rgba(0,0,0,0.14)', padding:4, minWidth:170 }}>
           {menuItems.map((item, i) => (
             <button key={i} onClick={(e) => { e.stopPropagation(); item.action(); }}
               style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'7px 10px',
@@ -256,36 +296,58 @@ function VerifyChip({ id, content }) {
         document.body
       )}
 
-      {/* Tooltip — portaled to body */}
-      {tipVisible && coords.tip && record?.verified && ReactDOM.createPortal(
+      {/* Tooltip */}
+      {tipVisible && coords.tip && (isVerified || isEdited) && ReactDOM.createPortal(
         <div style={{ position:'fixed', bottom:coords.tip.bottom, left:coords.tip.left, zIndex:1001,
-          background:'#1C1917', borderRadius:9, padding:'9px 13px', fontSize:11, color:'#E7E5E4',
-          lineHeight:1.6, minWidth:190, boxShadow:'0 8px 28px rgba(0,0,0,0.38)',
-          pointerEvents:'none', whiteSpace:'nowrap' }}>
-          {latestFix ? (
+          background:'#1C1917', borderRadius:9, padding:'10px 13px', fontSize:11, color:'#E7E5E4',
+          lineHeight:1.65, minWidth:210, maxWidth:270, boxShadow:'0 8px 28px rgba(0,0,0,0.38)',
+          pointerEvents:'none' }}>
+          {isVerified ? (
             <>
-              <p style={{ fontWeight:700, color:'#FFF', marginBottom:2 }}>Fixed &amp; Verified</p>
-              <p style={{ color:'#A8A29E' }}>by {latestFix.by}</p>
-              <p style={{ color:'#78716C', fontSize:10 }}>{fmt(latestFix.at)}</p>
-              {latestFix.note && (
-                <p style={{ color:'#D6D3D1', marginTop:6, fontStyle:'italic', whiteSpace:'normal',
-                  maxWidth:240, borderTop:'1px solid #3C3836', paddingTop:6 }}>"{latestFix.note}"</p>
+              <p style={{ fontWeight:700, color:'#FFF', marginBottom:6 }}>
+                Verified by {activeVerifications.length} {activeVerifications.length === 1 ? 'person' : 'people'}
+              </p>
+              {activeVerifications.map((v, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:7, marginBottom:3 }}>
+                  <span style={{ width:16, height:16, borderRadius:'50%', background:'#3D6B2E', color:'#fff', flexShrink:0,
+                    display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700 }}>
+                    {(v.by||'?')[0].toUpperCase()}
+                  </span>
+                  <span style={{ color:'#D6D3D1', flex:1 }}>{v.by}</span>
+                  <span style={{ color:'#57534E', fontSize:10 }}>{fmt(v.at)}</span>
+                </div>
+              ))}
+              {fixes.length > 0 && (
+                <p style={{ color:'#57534E', fontSize:10, marginTop:6, borderTop:'1px solid #3C3836', paddingTop:6 }}>
+                  {fixes.length} revision{fixes.length > 1 ? 's' : ''} in history
+                </p>
               )}
-              {record.fixes.length > 1 && <p style={{ color:'#57534E', marginTop:4, fontSize:10 }}>{record.fixes.length} revisions</p>}
             </>
           ) : (
             <>
-              <p style={{ fontWeight:700, color:'#FFF', marginBottom:2 }}>Verified</p>
-              <p style={{ color:'#A8A29E' }}>by {record.by}</p>
-              <p style={{ color:'#78716C', fontSize:10 }}>{fmt(record.at)}</p>
+              <p style={{ fontWeight:700, color:'#F5B843', marginBottom:4 }}>Verification voided by edit</p>
+              <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:3 }}>
+                <span style={{ width:16, height:16, borderRadius:'50%', background:'#92400E', color:'#fff', flexShrink:0,
+                  display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700 }}>
+                  {(latestFix?.by||'?')[0].toUpperCase()}
+                </span>
+                <span style={{ color:'#D6D3D1' }}>{latestFix?.by}</span>
+                <span style={{ color:'#57534E', fontSize:10, marginLeft:'auto' }}>{fmt(latestFix?.at)}</span>
+              </div>
+              {latestFix?.note && (
+                <p style={{ color:'#A8A29E', fontStyle:'italic', borderTop:'1px solid #3C3836', paddingTop:6, marginTop:4 }}>
+                  "{latestFix.note}"
+                </p>
+              )}
+              <p style={{ color:'#57534E', fontSize:10, marginTop:6 }}>Verify again to confirm this version.</p>
             </>
           )}
         </div>,
         document.body
       )}
 
-      {/* Fix / Report form — portaled to body */}
-      {mode && coords.form && ReactDOM.createPortal(
+      {/* Fix / Report form */}
+      {mode && coords.form && canAct && ReactDOM.createPortal(
         <div ref={formRef} style={{ position:'fixed', top:coords.form.top, right:coords.form.right,
           zIndex:1000, width:296, background:'#F8F8F7', borderRadius:10,
           border: mode === 'report' ? '1px solid #FECACA' : '1px solid #E2E1DF',
@@ -302,13 +364,20 @@ function VerifyChip({ id, content }) {
                 style={{ width:'100%', marginTop:6, borderRadius:6, border:'1px solid #D0CAC3', background:'#FFF',
                   padding:'5px 8px', fontSize:11, color:'#14110D', outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}
                 onFocus={e => e.target.style.borderColor='#14110D'} onBlur={e => e.target.style.borderColor='#D0CAC3'}/>
+              {isVerified && (
+                <div style={{ display:'flex', alignItems:'flex-start', gap:5, marginTop:7, padding:'5px 7px', background:'#FFFBEB', borderRadius:5, border:'1px solid #FDE68A' }}>
+                  <Ic.alert size={10} style={{ color:'#92400E', flexShrink:0, marginTop:1 }}/>
+                  <p style={{ fontSize:10, color:'#92400E', lineHeight:1.5 }}>This fix will void all current verifications.</p>
+                </div>
+              )}
               <div style={{ display:'flex', justifyContent:'flex-end', gap:6, marginTop:8 }}>
                 <button onClick={() => { setMode(null); setFixText(''); setFixNote(''); }}
                   style={{ padding:'4px 10px', borderRadius:6, border:'1px solid #D0CAC3', background:'transparent', fontSize:11, color:'#6B5744', cursor:'pointer' }}>Cancel</button>
-                <button onClick={() => { doFix(id, content, fixText, fixNote, byName); setMode(null); setFixNote(''); toast?.success('Fix applied', 'Content updated and marked as verified'); }}
-                  disabled={!fixText.trim() || fixText.trim() === (content||'').trim()}
+                <button
+                  onClick={() => { doFix(id, content, fixText, fixNote, byName); setMode(null); setFixNote(''); toast?.success('Fix saved', isVerified ? 'Verification cleared — re-verify to confirm.' : 'Awaiting verification.'); }}
+                  disabled={!fixText.trim() || fixText.trim() === (latestFix?.fixed || content || '').trim()}
                   style={{ padding:'4px 10px', borderRadius:6, border:'none', background:'#14110D', color:'#FFF', fontSize:11, fontWeight:500, cursor:'pointer',
-                    opacity: (!fixText.trim() || fixText.trim() === (content||'').trim()) ? 0.38 : 1 }}>Apply Fix</button>
+                    opacity:(!fixText.trim() || fixText.trim() === (latestFix?.fixed || content || '').trim()) ? 0.38 : 1 }}>Apply Fix</button>
               </div>
             </>
           ) : (
@@ -322,9 +391,9 @@ function VerifyChip({ id, content }) {
               <div style={{ display:'flex', justifyContent:'flex-end', gap:6, marginTop:8 }}>
                 <button onClick={() => { setMode(null); setReportText(''); }}
                   style={{ padding:'4px 10px', borderRadius:6, border:'1px solid #D0CAC3', background:'transparent', fontSize:11, color:'#6B5744', cursor:'pointer' }}>Cancel</button>
-                <button onClick={() => { setMode(null); setReportText(''); toast?.success('Issue reported', 'Your report has been submitted for review'); }}
+                <button onClick={() => { setMode(null); setReportText(''); toast?.success('Issue reported', 'Submitted for review'); }}
                   disabled={!reportText.trim()}
-                  style={{ padding:'4px 10px', borderRadius:6, border:'none', background:'#7A2E20', color:'#FFF', fontSize:11, fontWeight:500, cursor:'pointer', opacity: !reportText.trim() ? 0.38 : 1 }}>Submit Report</button>
+                  style={{ padding:'4px 10px', borderRadius:6, border:'none', background:'#7A2E20', color:'#FFF', fontSize:11, fontWeight:500, cursor:'pointer', opacity:!reportText.trim() ? 0.38 : 1 }}>Submit</button>
               </div>
             </>
           )}
