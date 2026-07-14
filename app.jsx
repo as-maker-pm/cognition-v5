@@ -1406,13 +1406,13 @@ function CaseChatPanel({ selectedCase }) {
 
   return (
     <div className="w-[420px] shrink-0 border-l border-[#E2E1DF] flex flex-col bg-[#F8F8F7]">
-      {/* Chat header: history + title + new chat */}
+      {/* Chat header: title + history + new chat */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#E2E1DF] shrink-0">
+        <span className="flex-1 text-[12px] text-[#9A8573] truncate min-w-0">{active?.title || 'New chat'}</span>
         <button onClick={() => setHistoryOpen(o => !o)} title="Chat history"
           className={cls('w-7 h-7 flex items-center justify-center rounded-lg transition-colors', historyOpen ? 'bg-[#14110D] text-white' : 'text-[#9A8573] hover:bg-[#E8E6E3]')}>
-          <Ic.msg size={13}/>
+          <Ic.clock size={13}/>
         </button>
-        <span className="flex-1 text-[12px] text-[#9A8573] truncate min-w-0">{active?.title || 'New chat'}</span>
         <button onClick={newChat} title="New chat"
           className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors">
           <Ic.plus size={14}/>
@@ -1538,18 +1538,46 @@ const CASE_WITNESSES_INFO = {
 };
 
 const CASE_TIMELINE_EVENTS = [
-  { id:'ev1', witness:'depo-001', date:'2023-01-15', time:'10:00 AM', category:'document', title:'Employment Contract Signed',       contradiction:false, description:'Chen signed employment agreement with TechCorp as Senior PM. Contract includes Section 7 non-compete. Chen later claims limited knowledge of specific provisions.' },
-  { id:'ev2', witness:'depo-001', date:'2024-01-01', time:null,       category:'document', title:'2024 Compensation Amendment',      contradiction:false, description:'Annual compensation set at $185,000. Chen confirms signing the amendment but states she "signed many documents that day."' },
-  { id:'ev3', witness:'depo-001', date:'2024-06-03', time:'9:00 AM',  category:'action',   title:'Arrival Time — Chen Testimony',   contradiction:true,  description:'Chen testified arriving "around 9 AM," later revised to "closer to 9:15" under cross-examination.',   contradictionDetails:'Badge records (Exhibit E) show entry at 9:03 AM. Her revised 9:15 estimate is inconsistent with that record.' },
-  { id:'ev4', witness:'depo-001', date:'2024-06-03', time:'9:30 AM',  category:'meeting',  title:'Team Standup Meeting',            contradiction:false, description:'Weekly project standup. Chen was confident and consistent about this portion of her timeline.' },
-  { id:'ev5', witness:'depo-001', date:'2024-06-03', time:'2:00 PM',  category:'meeting',  title:'2PM Meeting — Chen Testimony',   contradiction:true,  description:'Chen testified the meeting "started a bit late, around 2:15." She confirmed attendance but showed notable nervousness.',  contradictionDetails:'Calendar and Anderson testimony confirm start at 2:02 PM — a 13-minute discrepancy.' },
-  { id:'ev6', witness:'depo-001', date:'2024-06-03', time:'4:30 PM',  category:'action',   title:'Section 7 Legal Review Email',   contradiction:true,  description:'Chen forwarded Section 7 to outside counsel for review on the same day she claimed limited familiarity with its contents.',  contradictionDetails:'Exhibit F shows she initiated legal review of the exact clause she claimed not to recall (Section 7).' },
-  { id:'rm1', witness:'depo-007', date:'2023-01-15', time:'10:00 AM', category:'record',   title:'Contract Signing — HR Confirms', contradiction:true,  description:'HR Director confirms employees received verbal briefing on Section 7 non-compete at time of signing.',  contradictionDetails:'Martinez states all employees were explicitly informed. Chen claimed unfamiliarity with Section 7 specifics.' },
-  { id:'rm2', witness:'depo-007', date:'2024-04-12', time:'2:30 PM',  category:'meeting',  title:'Mandatory Compliance Session',   contradiction:false, description:'HR-led compliance meeting attended by all department heads including Chen. Non-compete obligations and breach consequences explicitly covered. Martinez holds signed attendance sheet.' },
-  { id:'rm3', witness:'depo-007', date:'2024-06-03', time:'9:03 AM',  category:'record',   title:'Badge Entry — Confirmed 9:03 AM', contradiction:true,  description:'HR badge access logs show Chen entered at 9:03 AM. Martinez produced Exhibit E in support.',  contradictionDetails:'Chen revised arrival estimate to "closer to 9:15." Badge records definitively place entry at 9:03 AM.' },
-  { id:'la1', witness:'depo-008', date:'2024-05-15', time:'3:00 PM',  category:'document', title:'Contract Compliance Notice',      contradiction:false, description:'VP Operations confirms all department heads, including Chen, received formal written notice reiterating contractual obligations — one month before the disputed events.' },
-  { id:'la2', witness:'depo-008', date:'2024-06-03', time:'2:02 PM',  category:'meeting',  title:'2PM Meeting — Confirmed 2:02 PM', contradiction:true,  description:'Anderson confirms meeting began at 2:02 PM per calendar system and her own recollection. All attendees including Chen present from the start.',  contradictionDetails:'Chen placed the start "around 2:15." Anderson corroborated by Exhibits B and C — 13-minute discrepancy.' },
-  { id:'la3', witness:'depo-008', date:'2024-06-03', time:'4:30 PM',  category:'action',   title:'Post-Meeting Document Distribution', contradiction:false, description:'Anderson confirms contract documents distributed to all attendees after the 2PM session, including the amendment Chen later claimed was unfamiliar.' },
+  { id:'ev-contract',  witnesses:['depo-001','depo-007'], date:'2023-01-15', time:'10:00 AM', category:'document',
+    title:'Employment Contract Signed',
+    contradiction:true,
+    description:'TechCorp employment agreement signed by Chen as Senior PM, including Section 7 non-compete. HR records show all employees received a verbal briefing on Section 7 provisions at the time of signing.',
+    contradictionDetails:'Chen later testified limited knowledge of specific non-compete provisions. Martinez (HR) states all employees were explicitly informed at signing — directly contradicting Chen\'s account.' },
+  { id:'ev-amendment', witnesses:['depo-001'],            date:'2024-01-01', time:null,       category:'document',
+    title:'2024 Compensation Amendment',
+    contradiction:false,
+    description:'Annual compensation set at $185,000. Chen confirms signing the amendment but states she "signed many documents that day." No corroborating testimony from other deponents.' },
+  { id:'ev-compliance',witnesses:['depo-007'],            date:'2024-04-12', time:'2:30 PM',  category:'meeting',
+    title:'Mandatory Compliance Session',
+    contradiction:false,
+    description:'HR-led compliance meeting attended by all department heads including Chen. Non-compete obligations and breach consequences explicitly covered. Martinez holds signed attendance sheet.' },
+  { id:'ev-notice',    witnesses:['depo-008'],            date:'2024-05-15', time:'3:00 PM',  category:'document',
+    title:'Contract Compliance Notice',
+    contradiction:false,
+    description:'VP Operations confirms all department heads, including Chen, received formal written notice reiterating contractual obligations — one month before the disputed events.' },
+  { id:'ev-arrival',   witnesses:['depo-001','depo-007'], date:'2024-06-03', time:'9:00 AM',  category:'record',
+    title:'Chen Arrival Time',
+    contradiction:true,
+    description:'Chen testified arriving "around 9 AM," later revised to "closer to 9:15" under cross-examination. Badge records (Exhibit E) produced by Martinez show entry logged at exactly 9:03 AM.',
+    contradictionDetails:'Chen\'s revised estimate of 9:15 AM is inconsistent with HR badge records. Martinez confirms the logs are unaltered and place entry at 9:03 AM.' },
+  { id:'ev-standup',   witnesses:['depo-001'],            date:'2024-06-03', time:'9:30 AM',  category:'meeting',
+    title:'Morning Team Standup',
+    contradiction:false,
+    description:'Weekly project standup. Chen was confident and consistent about this portion of her timeline. Not referenced in other depositions.' },
+  { id:'ev-2pm',       witnesses:['depo-001','depo-008'], date:'2024-06-03', time:'2:00 PM',  category:'meeting',
+    title:'2:00 PM All-Hands Meeting',
+    contradiction:true,
+    description:'Chen placed the meeting start "around 2:15." Anderson confirms the meeting began at 2:02 PM per calendar system and her personal recollection, with all attendees present from the start.',
+    contradictionDetails:'Calendar (Exhibit B) and attendance records (Exhibit C) confirm a 2:02 PM start — a 13-minute discrepancy with Chen\'s account.' },
+  { id:'ev-docs',      witnesses:['depo-008'],            date:'2024-06-03', time:'4:15 PM',  category:'action',
+    title:'Post-Meeting Document Distribution',
+    contradiction:false,
+    description:'Anderson confirms contract documents, including the amendment Chen later claimed was unfamiliar, were distributed to all attendees after the 2PM session.' },
+  { id:'ev-email',     witnesses:['depo-001'],            date:'2024-06-03', time:'4:30 PM',  category:'action',
+    title:'Section 7 Legal Review Email',
+    contradiction:true,
+    description:'Chen forwarded Section 7 to outside counsel for legal review on the same afternoon she testified limited familiarity with its contents.',
+    contradictionDetails:'Exhibit F shows Chen initiated legal review of the exact clause she claimed not to recall — directly undermining her stated unfamiliarity with Section 7.' },
 ];
 
 const CASE_MAP_DATA = {
@@ -1589,9 +1617,9 @@ const CASE_MAP_DATA = {
 // ---------- Case Level Timeline ----------
 function CaseLevelTimeline() {
   const [filter, setFilter] = useState(null);
-  const witnesses = Object.entries(CASE_WITNESSES_INFO).map(([id, w]) => ({ id, ...w }));
+  const allWitnesses = Object.entries(CASE_WITNESSES_INFO).map(([id, w]) => ({ id, ...w }));
 
-  const events = CASE_TIMELINE_EVENTS.filter(ev => !filter || ev.witness === filter);
+  const events = CASE_TIMELINE_EVENTS.filter(ev => !filter || ev.witnesses.includes(filter));
   const sorted = [...events].sort((a, b) => {
     const d = a.date.localeCompare(b.date);
     return d !== 0 ? d : (a.time || '').localeCompare(b.time || '');
@@ -1606,21 +1634,21 @@ function CaseLevelTimeline() {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
   };
-  const catIcon = (cat) => cat === 'document' ? <Ic.fileText size={10}/> : cat === 'meeting' ? <Ic.calendar size={10}/> : <Ic.clock size={10}/>;
-  const contraCount = CASE_TIMELINE_EVENTS.filter(ev => ev.contradiction && (!filter || ev.witness === filter)).length;
+  const contraCount = CASE_TIMELINE_EVENTS.filter(ev => ev.contradiction && (!filter || ev.witnesses.includes(filter))).length;
+  const primaryColor = (ev) => ev.contradiction ? '#DC2626' : (CASE_WITNESSES_INFO[ev.witnesses[0]]?.color || '#9A8573');
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#F8F8F7]">
       {/* Witness filter bar */}
-      <div className="px-6 py-3 border-b border-[#E2E1DF] flex items-center gap-3 shrink-0">
-        <span className="text-[11px] font-semibold text-[#9A8573] uppercase tracking-wider shrink-0">Filter by deponent</span>
-        <div className="flex items-center gap-2 flex-1">
+      <div className="px-6 py-3 border-b border-[#E2E1DF] flex items-center gap-3 shrink-0 flex-wrap">
+        <span className="text-[11px] font-semibold text-[#9A8573] uppercase tracking-wider shrink-0">Filter</span>
+        <div className="flex items-center gap-2 flex-wrap flex-1">
           <button onClick={() => setFilter(null)}
             className={cls('text-[12px] px-3 py-1.5 rounded-full border transition-colors',
               !filter ? 'bg-[#14110D] text-white border-[#14110D]' : 'border-[#E2E1DF] text-[#6B5744] hover:border-[#14110D]')}>
             All witnesses
           </button>
-          {witnesses.map(w => (
+          {allWitnesses.map(w => (
             <button key={w.id} onClick={() => setFilter(w.id === filter ? null : w.id)}
               style={{ borderColor: filter === w.id ? w.color : undefined, background: filter === w.id ? w.bg : undefined, color: filter === w.id ? w.color : undefined }}
               className={cls('text-[12px] px-3 py-1.5 rounded-full border transition-colors',
@@ -1631,7 +1659,7 @@ function CaseLevelTimeline() {
         </div>
         {contraCount > 0 && (
           <span className="inline-flex items-center gap-1 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1 shrink-0">
-            <Ic.alert size={11}/> {contraCount} cross-deposition conflict{contraCount > 1 ? 's' : ''}
+            <Ic.alert size={11}/> {contraCount} conflict{contraCount > 1 ? 's' : ''}
           </span>
         )}
       </div>
@@ -1647,32 +1675,47 @@ function CaseLevelTimeline() {
             <div className="relative pl-6 flex flex-col gap-3">
               <div className="absolute left-[7px] top-3 bottom-3 w-px bg-[#E2E1DF]"/>
               {grouped[date].map(ev => {
-                const w = CASE_WITNESSES_INFO[ev.witness];
+                const isSolo = ev.witnesses.length === 1;
+                const dotColor = primaryColor(ev);
                 return (
                   <div key={ev.id} className="relative">
                     <div className="absolute -left-[19px] top-4 w-3 h-3 rounded-full border-2 z-10"
-                      style={{ background: ev.contradiction ? '#DC2626' : w.color, borderColor: ev.contradiction ? '#DC2626' : w.color }}/>
+                      style={{ background: dotColor, borderColor: dotColor }}/>
                     <div className={cls('rounded-xl px-4 py-3.5 border',
-                      ev.contradiction ? 'bg-[#FEF2F2] border-[#FECACA]' : 'bg-white border-[#E2E1DF]')}>
+                      ev.contradiction ? 'bg-[#FEF2F2] border-[#FECACA]' : isSolo ? 'bg-[#FFFDF5] border-[#E8E0C8]' : 'bg-white border-[#E2E1DF]')}>
                       <div className="flex items-start justify-between gap-3 mb-1.5">
                         <div className="flex-1 min-w-0">
                           {ev.time && <div className="text-[10px] font-mono text-[#9A8573] mb-0.5">{ev.time}</div>}
                           <div className="text-[13px] font-semibold text-[#14110D] leading-snug">{ev.title}</div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                        {/* Right badges: conflict flag + witness pills + solo indicator */}
+                        <div className="flex flex-col items-end gap-1.5 shrink-0 mt-0.5">
                           {ev.contradiction && (
                             <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#DC2626] bg-[#FEE2E2] px-2 py-0.5 rounded-full whitespace-nowrap">
                               <Ic.alert size={8}/> Conflict
                             </span>
                           )}
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                            style={{ background: w.bg, color: w.color }}>
-                            <span style={{ width:12, height:12, borderRadius:'50%', background:w.color, color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:7, fontWeight:800, flexShrink:0 }}>{w.initials}</span>
-                            {w.short}
-                          </span>
+                          <div className="flex items-center gap-1 flex-wrap justify-end">
+                            {ev.witnesses.map(wid => {
+                              const w = CASE_WITNESSES_INFO[wid];
+                              if (!w) return null;
+                              return (
+                                <span key={wid} className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                  style={{ background: w.bg, color: w.color }}>
+                                  <span style={{ width:12, height:12, borderRadius:'50%', background:w.color, color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:7, fontWeight:800, flexShrink:0 }}>{w.initials}</span>
+                                  {w.short}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          {isSolo && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-[#92400E] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded-full whitespace-nowrap">
+                              Sole account
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <p className="text-[12px] text-[#6B5744] leading-relaxed mb-2">{ev.description}</p>
+                      <p className="text-[12px] text-[#6B5744] leading-relaxed">{ev.description}</p>
                       {ev.contradiction && ev.contradictionDetails && (
                         <div className="mt-2 pt-2.5 border-t border-[#FECACA] flex items-start gap-2">
                           <Ic.alert size={11} className="text-[#DC2626] mt-0.5 shrink-0"/>
@@ -2957,11 +3000,11 @@ function ChatTab({ depo }) {
     <div className="flex flex-col h-full min-h-0 bg-[#F8F8F7]">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-[#E2E1DF] shrink-0">
+        <span className="flex-1 text-[11px] text-[#9A8573] truncate min-w-0">{active?.title || 'New chat'}</span>
         <button onClick={() => setHistoryOpen(o => !o)} title="Chat history"
           className={cls('w-7 h-7 flex items-center justify-center rounded-lg transition-colors', historyOpen ? 'bg-[#14110D] text-white' : 'text-[#9A8573] hover:bg-[#E8E6E3]')}>
-          <Ic.msg size={13}/>
+          <Ic.clock size={13}/>
         </button>
-        <span className="flex-1 text-[11px] text-[#9A8573] truncate min-w-0">{active?.title || 'New chat'}</span>
         <button onClick={newChat} title="New chat"
           className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors">
           <Ic.plus size={14}/>
