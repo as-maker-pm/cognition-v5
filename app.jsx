@@ -2020,7 +2020,549 @@ function CaseLevelMap() {
   );
 }
 
-// ---------- Deposition Library ----------
+// ---------- Case Level Exhibits Data ----------
+const MOCK_EXHIBITS = [
+  { id:'ex-a', label:'EXHIBIT A', name:'Employment Contract',
+    type:'contract', status:'uploaded', producedBy:'Defense (TechCorp)',
+    dateOfDoc:'2023-01-15', dateProduced:'2023-01-15', bates:'TC-0001–TC-0047', pages:47,
+    description:'Standard TechCorp employment agreement executed by Sarah Chen as Senior Project Manager. Includes Section 7 non-compete clause restricting post-employment competitive activities for 24 months.',
+    tags:['Non-Compete','Section 7','Employment'],
+    depoRefs:[
+      { depoId:'depo-001', witness:'Sarah Chen',      page:24, line:3,  context:'Chen confirmed signing the agreement but stated she had "limited recall of the specific provisions in Section 7."' },
+      { depoId:'depo-007', witness:'Robert Martinez', page:8,  line:15, context:'Martinez identified Exhibit A as the standard TechCorp employment agreement and confirmed all hires were briefed on Section 7 at signing.' },
+    ],
+    timelineRefs:['ev-contract'], mapNodeRefs:['cxa'] },
+
+  { id:'ex-b', label:'EXHIBIT B', name:'Calendar Records — Jun 3',
+    type:'calendar', status:'uploaded', producedBy:'Defense (TechCorp)',
+    dateOfDoc:'2024-06-03', dateProduced:'2024-07-12', bates:'TC-0112–TC-0115', pages:4,
+    description:'Corporate calendar export showing the June 3 all-hands meeting with an auto-generated start time of 2:02 PM. Full attendee list included.',
+    tags:['Meeting','June 3','Timeline'],
+    depoRefs:[
+      { depoId:'depo-008', witness:'Lisa Anderson', page:31, line:7, context:'Anderson cited the calendar export confirming a 2:02 PM start, directly contradicting Chen\'s estimate of "around 2:15."' },
+    ],
+    timelineRefs:['ev-2pm'], mapNodeRefs:['cxbc'] },
+
+  { id:'ex-c', label:'EXHIBIT C', name:'Meeting Attendance Sheet',
+    type:'record', status:'missing', producedBy:'Defense (TechCorp)',
+    dateOfDoc:'2024-06-03', dateProduced:null, bates:null, pages:null,
+    description:'Sign-in sheet from the June 3 all-hands meeting confirming all attendees, including Chen, were present from the 2:02 PM start. Not yet produced in discovery.',
+    tags:['Meeting','June 3','Attendance'],
+    depoRefs:[
+      { depoId:'depo-008', witness:'Lisa Anderson', page:33, line:2, context:'Anderson referenced the attendance sheet as corroborating evidence for the 2:02 PM start time.' },
+    ],
+    timelineRefs:['ev-2pm'], mapNodeRefs:['cxbc'] },
+
+  { id:'ex-e', label:'EXHIBIT E', name:'Badge Access Logs',
+    type:'record', status:'uploaded', producedBy:'Defense (TechCorp)',
+    dateOfDoc:'2024-06-03', dateProduced:'2024-07-12', bates:'TC-0201–TC-0208', pages:8,
+    description:'Security badge entry and exit log for June 3, 2024. Shows Chen\'s building entry at 9:03 AM — directly contradicting her revised testimony of "closer to 9:15 AM."',
+    tags:['Badge','June 3','Contradiction','Arrival'],
+    depoRefs:[
+      { depoId:'depo-001', witness:'Sarah Chen',      page:44, line:18, context:'Chen acknowledged the log under cross-examination but maintained her revised time estimate.' },
+      { depoId:'depo-007', witness:'Robert Martinez', page:17, line:9,  context:'Martinez produced the badge logs and confirmed the records are unaltered system exports from the HR database.' },
+    ],
+    timelineRefs:['ev-arrival'], mapNodeRefs:['cxe'] },
+
+  { id:'ex-f', label:'EXHIBIT F', name:'Email Thread — Legal Review',
+    type:'email', status:'missing', producedBy:'Plaintiff',
+    dateOfDoc:'2024-06-03', dateProduced:null, bates:null, pages:null,
+    description:'Email chain initiated by Chen to outside counsel on June 3, 2024, requesting a legal review of Section 7. Directly contradicts her testimony of limited familiarity with the clause.',
+    tags:['Email','Section 7','Outside Counsel','Contradiction'],
+    depoRefs:[
+      { depoId:'depo-001', witness:'Sarah Chen', page:58, line:22, context:'Chen acknowledged sending the email but characterized it as "routine inbox forwarding" rather than a deliberate legal inquiry.' },
+    ],
+    timelineRefs:['ev-email'], mapNodeRefs:['cxf'] },
+
+  { id:'ex-g', label:'EXHIBIT G', name:'Compliance Session Roster',
+    type:'record', status:'missing', producedBy:null,
+    dateOfDoc:'2024-04-12', dateProduced:null, bates:null, pages:null,
+    description:'Signed attendance roster from the April 12 mandatory compliance session. Martinez holds the original; not yet produced in discovery.',
+    tags:['Compliance','April 12','Attendance'],
+    depoRefs:[
+      { depoId:'depo-007', witness:'Robert Martinez', page:21, line:4, context:'Martinez stated he retains the signed attendance sheet and can produce it upon request.' },
+    ],
+    timelineRefs:['ev-compliance'], mapNodeRefs:[] },
+
+  { id:'ex-h', label:'EXHIBIT H', name:'2024 Compensation Amendment',
+    type:'contract', status:'uploaded', producedBy:'Defense (TechCorp)',
+    dateOfDoc:'2024-01-01', dateProduced:'2024-07-12', bates:'TC-0048–TC-0051', pages:4,
+    description:'Annual compensation amendment setting Chen\'s salary at $185,000 for 2024. Chen confirmed signing but stated she "signed many documents that day."',
+    tags:['Compensation','Amendment','Employment'],
+    depoRefs:[
+      { depoId:'depo-001', witness:'Sarah Chen', page:29, line:11, context:'Chen confirmed signing the amendment but said she could not recall specific provisions from the signing day.' },
+    ],
+    timelineRefs:['ev-amendment'], mapNodeRefs:[] },
+];
+
+// ---------- Exhibit Detail Panel ----------
+function ExhibitDetailPanel({ exhibit: e, status, onUpload, canEdit, onClose }) {
+  const [tab, setTab] = useState('overview');
+  const timelineRefs = e.timelineRefs.map(id => CASE_TIMELINE_EVENTS.find(ev => ev.id === id)).filter(Boolean);
+  const mapRefs = e.mapNodeRefs.map(id => CASE_MAP_DATA.nodes.find(n => n.id === id)).filter(Boolean);
+  const typeStyle = { contract:{bg:'#EFF6FF',color:'#1D4E89'}, email:{bg:'#FEF9C3',color:'#92400E'},
+    record:{bg:'#F0FDF4',color:'#1A7A40'}, calendar:{bg:'#F5F3FF',color:'#6D28D9'} };
+  const ts = typeStyle[e.type] || { bg:'#F8F8F7', color:'#9A8573' };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-white border-l border-[#E2E1DF]">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-[#E2E1DF] shrink-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-[11px] font-bold tracking-wider text-[#9A8573]">{e.label}</span>
+              <span className={cls('text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border',
+                status === 'uploaded' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
+                {status === 'uploaded' ? '✓ Uploaded' : 'Missing doc'}
+              </span>
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full capitalize"
+                style={{ background:ts.bg, color:ts.color }}>{e.type}</span>
+            </div>
+            <h2 className="text-[16px] font-bold text-[#14110D] leading-tight">{e.name}</h2>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {status === 'missing' && canEdit && (
+              <button onClick={onUpload}
+                className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-[#14110D] text-white rounded-lg hover:bg-[#2C2316] transition-colors">
+                <Ic.upload size={12}/> Upload
+              </button>
+            )}
+            {status === 'uploaded' && (
+              <button className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 border border-[#E2E1DF] text-[#6B5744] rounded-lg hover:bg-[#F2F0EC] transition-colors">
+                <Ic.eye size={12}/> View
+              </button>
+            )}
+            <button onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E9E8E7] transition-colors">
+              <Ic.x size={14}/>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Doc preview area */}
+      <div className="mx-5 mt-4 mb-3 shrink-0">
+        <div className={cls('h-36 rounded-xl border-2 border-dashed flex items-center justify-center',
+          status === 'uploaded' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
+          {status === 'uploaded' ? (
+            <div className="text-center px-4">
+              <Ic.fileText size={26} className="mx-auto mb-2 text-emerald-600"/>
+              <p className="text-[12px] font-semibold text-emerald-800">{e.name}</p>
+              {e.pages && <p className="text-[10px] text-emerald-600 mt-0.5">{e.pages} pages · {e.bates}</p>}
+              <button className="mt-1.5 text-[11px] font-medium text-[#1D4E89] hover:underline">Open document ↗</button>
+            </div>
+          ) : (
+            <div className="text-center px-4">
+              <Ic.alert size={22} className="mx-auto mb-2 text-amber-500"/>
+              <p className="text-[12px] font-semibold text-amber-800">Document not yet uploaded</p>
+              <p className="text-[10px] text-amber-600 mt-0.5">Referenced in case but file is missing</p>
+              {canEdit && (
+                <button onClick={onUpload} className="mt-1.5 text-[11px] font-medium text-[#1D4E89] hover:underline">Upload document →</button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="px-5 border-b border-[#E2E1DF] flex gap-4 shrink-0">
+        {[['overview','Overview'],['metadata','Metadata'],['refs','Referenced In']].map(([id,label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={cls('py-2 text-[12px] font-medium border-b-2 transition-colors',
+              tab === id ? 'border-[#14110D] text-[#14110D]' : 'border-transparent text-[#9A8573] hover:text-[#6B5744]')}>
+            {label}{id === 'refs' && e.depoRefs.length > 0 && (
+              <span className="ml-1 text-[10px] text-[#9A8573]">({e.depoRefs.length + timelineRefs.length + mapRefs.length})</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto px-5 py-4">
+        {tab === 'overview' && (
+          <div>
+            <p className="text-[13px] text-[#3D2E1E] leading-relaxed mb-4">{e.description}</p>
+            {e.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {e.tags.map(tag => (
+                  <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F2EFE9] text-[#6B5744] border border-[#E0DBD3]">{tag}</span>
+                ))}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                ['Type', e.type], ['Produced By', e.producedBy || 'Unknown'],
+                ['Document Date', e.dateOfDoc || '—'], ['Depo Citations', e.depoRefs.length],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-[#F8F8F7] rounded-lg px-3 py-2.5 border border-[#E9E8E7]">
+                  <div className="text-[10px] text-[#9A8573] uppercase tracking-wider mb-0.5">{label}</div>
+                  <div className="text-[13px] font-semibold text-[#14110D] capitalize">{String(value)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'metadata' && (
+          <div>
+            {[
+              ['Exhibit ID', e.label], ['Document Name', e.name],
+              ['Type', e.type], ['Status', status === 'uploaded' ? 'Uploaded' : 'Not yet produced'],
+              ['Produced By', e.producedBy || 'Unknown'], ['Date of Document', e.dateOfDoc || '—'],
+              ['Date Produced', e.dateProduced || 'Not yet produced'], ['Bates Range', e.bates || 'Unassigned'],
+              ['Pages', e.pages ? `${e.pages} pages` : '—'],
+            ].map(([label, value]) => (
+              <div key={label} className="flex py-2.5 border-b border-[#F0EDE8] last:border-0">
+                <span className="text-[11px] text-[#9A8573] w-36 shrink-0 pt-0.5">{label}</span>
+                <span className="text-[12px] text-[#14110D] font-medium capitalize leading-relaxed">{String(value)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'refs' && (
+          <div className="flex flex-col gap-5">
+            {e.depoRefs.length > 0 && (
+              <div>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#9A8573] mb-2.5">
+                  Depositions · {e.depoRefs.length} citation{e.depoRefs.length > 1 ? 's' : ''}
+                </h4>
+                <div className="flex flex-col gap-2">
+                  {e.depoRefs.map((ref, i) => {
+                    const w = Object.values(CASE_WITNESSES_INFO).find(wi => wi.name === ref.witness);
+                    return (
+                      <div key={i} className="bg-[#F8F8F7] rounded-xl px-3 py-3 border border-[#E2E1DF]">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          {w && <span style={{ width:18,height:18,borderRadius:'50%',background:w.color,color:'#fff',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,flexShrink:0 }}>{w.initials}</span>}
+                          <span className="text-[12px] font-semibold text-[#14110D]">{ref.witness}</span>
+                          <span className="text-[10px] font-mono text-[#9A8573] ml-auto">p.{ref.page} l.{ref.line}</span>
+                        </div>
+                        <p className="text-[11px] text-[#6B5744] leading-relaxed italic">"{ref.context}"</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {timelineRefs.length > 0 && (
+              <div>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#9A8573] mb-2.5">
+                  Timeline Events · {timelineRefs.length}
+                </h4>
+                <div className="flex flex-col gap-1.5">
+                  {timelineRefs.map(ev => (
+                    <div key={ev.id} className="flex items-center gap-2.5 px-3 py-2.5 bg-[#F8F8F7] rounded-lg border border-[#E2E1DF]">
+                      <Ic.calendar size={11} className="text-[#9A8573] shrink-0"/>
+                      <span className="text-[12px] text-[#14110D] font-medium flex-1">{ev.title}</span>
+                      <span className="text-[10px] text-[#9A8573] font-mono">{ev.date}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {mapRefs.length > 0 && (
+              <div>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#9A8573] mb-2.5">
+                  Relationship Map · {mapRefs.length}
+                </h4>
+                <div className="flex flex-col gap-1.5">
+                  {mapRefs.map(node => (
+                    <div key={node.id} className="flex items-center gap-2.5 px-3 py-2.5 bg-[#F8F8F7] rounded-lg border border-[#E2E1DF]">
+                      <Ic.graph size={11} className="text-[#9A8573] shrink-0"/>
+                      <span className="text-[12px] text-[#14110D] font-medium">{node.label}</span>
+                      {node.sub && <span className="text-[10px] text-[#9A8573]">· {node.sub}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {e.depoRefs.length === 0 && timelineRefs.length === 0 && mapRefs.length === 0 && (
+              <div className="text-center py-8 text-[#9A8573]">
+                <Ic.fileText size={28} className="mx-auto mb-2 opacity-30"/>
+                <p className="text-[13px]">No cross-references found.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Upload Exhibit Modal ----------
+function UploadExhibitModal({ exhibits, targetId, onComplete, onClose }) {
+  const [selectedId, setSelectedId] = useState(targetId || '');
+  const [fileName, setFileName] = useState(null);
+  const [stage, setStage] = useState('drop');
+  const [isDragging, setIsDragging] = useState(false);
+  const target = exhibits.find(e => e.id === targetId);
+
+  // Simulated AI suggestions when uploading without a pre-set target
+  const AI_SUGGESTIONS = [
+    { id:'ex-c', confidence:94, reason:'Document layout matches attendance sign-in format; date Jun 3, 2024 aligns with Exhibit C.' },
+    { id:'ex-f', confidence:67, reason:'Contains email headers with legal references to Section 7 and outside counsel.' },
+  ];
+
+  const handleFile = (file) => { if (file) { setFileName(file.name); setStage('match'); } };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-[200] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[480px] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-[#E2E1DF] flex items-center justify-between">
+          <div>
+            <h3 className="text-[15px] font-bold text-[#14110D]">Upload Exhibit</h3>
+            {target && <p className="text-[11px] text-[#9A8573] mt-0.5">Uploading against {target.label} — {target.name}</p>}
+          </div>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E9E8E7]">
+            <Ic.x size={14}/>
+          </button>
+        </div>
+
+        <div className="p-6">
+          {stage === 'drop' && (
+            <label
+              className={cls('flex flex-col items-center justify-center h-44 rounded-xl border-2 border-dashed cursor-pointer transition-colors',
+                isDragging ? 'border-[#14110D] bg-[#F2F0EC]' : 'border-[#E2E1DF] hover:border-[#9A8573]')}
+              onDragOver={ev => { ev.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={ev => { ev.preventDefault(); setIsDragging(false); handleFile(ev.dataTransfer.files?.[0]); }}>
+              <input type="file" className="hidden" accept=".pdf,.doc,.docx,.png,.jpg"
+                onChange={ev => handleFile(ev.target.files?.[0])}/>
+              <Ic.upload size={28} className="text-[#C4B5A2] mb-3"/>
+              <p className="text-[13px] font-semibold text-[#6B5744]">Drop file here or click to browse</p>
+              <p className="text-[11px] text-[#9A8573] mt-1">PDF, Word, or image · up to 250 MB</p>
+            </label>
+          )}
+
+          {stage === 'match' && (
+            <div>
+              {/* File confirmed */}
+              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200 mb-4">
+                <Ic.fileText size={18} className="text-emerald-700 shrink-0"/>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-semibold text-emerald-800 truncate">{fileName}</p>
+                  <p className="text-[10px] text-emerald-600">Ready to assign</p>
+                </div>
+                <button onClick={() => { setFileName(null); setStage('drop'); }}
+                  className="ml-auto text-emerald-600 hover:text-emerald-800"><Ic.x size={13}/></button>
+              </div>
+
+              {/* AI suggestions (only when no pre-set target) */}
+              {!targetId && (
+                <div className="mb-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9A8573] mb-2">AI Match Suggestions</p>
+                  {AI_SUGGESTIONS.map(s => {
+                    const ex = exhibits.find(e => e.id === s.id);
+                    return ex ? (
+                      <button key={s.id} onClick={() => setSelectedId(s.id)}
+                        className={cls('w-full text-left p-3 rounded-xl border mb-2 transition-colors',
+                          selectedId === s.id ? 'border-[#14110D] bg-[#F2F0EC]' : 'border-[#E2E1DF] hover:bg-[#F8F8F7]')}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[12px] font-bold text-[#14110D]">{ex.label} · {ex.name}</span>
+                          <span className={cls('text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2',
+                            s.confidence > 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                            {s.confidence}% match
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#9A8573] leading-relaxed">{s.reason}</p>
+                      </button>
+                    ) : null;
+                  })}
+                </div>
+              )}
+
+              {/* Manual assignment */}
+              <div className="mb-5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9A8573] mb-2">
+                  {targetId ? 'Assigned to' : 'Or assign manually'}
+                </p>
+                <select value={selectedId} onChange={ev => setSelectedId(ev.target.value)}
+                  className="w-full border border-[#E2E1DF] rounded-lg px-3 py-2 text-[13px] text-[#14110D] bg-white outline-none focus:border-[#14110D] transition-colors">
+                  <option value="">Select exhibit…</option>
+                  {exhibits.map(ex => (
+                    <option key={ex.id} value={ex.id}>{ex.label} — {ex.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={() => { setStage('drop'); setFileName(null); }}
+                  className="flex-1 py-2 text-[13px] border border-[#E2E1DF] rounded-lg text-[#6B5744] hover:bg-[#F8F8F7] transition-colors">
+                  Back
+                </button>
+                <button onClick={() => selectedId && onComplete(selectedId)}
+                  disabled={!selectedId}
+                  className="flex-1 py-2 text-[13px] bg-[#14110D] text-white rounded-lg font-medium hover:bg-[#2C2316] transition-colors disabled:opacity-40">
+                  Confirm Upload
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Case Level Exhibits ----------
+function CaseLevelExhibits() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const canEdit = user?.role === 'admin' || user?.role === 'editor';
+  const [filter, setFilter] = useState('all');
+  const [selectedId, setSelectedId] = useState(null);
+  const [uploadTarget, setUploadTarget] = useState(null);
+  // Track which exhibits have been uploaded this session (starts from mock data)
+  const [uploadedSet, setUploadedSet] = useState(
+    () => new Set(MOCK_EXHIBITS.filter(e => e.status === 'uploaded').map(e => e.id))
+  );
+
+  const statusOf = (e) => uploadedSet.has(e.id) ? 'uploaded' : 'missing';
+
+  const exhibits = MOCK_EXHIBITS.filter(e => {
+    const s = statusOf(e);
+    if (filter === 'uploaded') return s === 'uploaded';
+    if (filter === 'missing')  return s === 'missing';
+    return true;
+  });
+
+  const totalUploaded = MOCK_EXHIBITS.filter(e => uploadedSet.has(e.id)).length;
+  const totalMissing  = MOCK_EXHIBITS.filter(e => !uploadedSet.has(e.id)).length;
+  const pct = Math.round((totalUploaded / MOCK_EXHIBITS.length) * 100);
+
+  const selected = MOCK_EXHIBITS.find(e => e.id === selectedId);
+
+  const handleUploadComplete = (exhibitId) => {
+    setUploadedSet(prev => new Set([...prev, exhibitId]));
+    setUploadTarget(null);
+    const ex = MOCK_EXHIBITS.find(e => e.id === exhibitId);
+    toast?.success('Upload confirmed', ex ? `${ex.label} — ${ex.name}` : 'Exhibit uploaded');
+    setSelectedId(exhibitId);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Overview strip */}
+      <div className="px-6 py-4 border-b border-[#E2E1DF] bg-white shrink-0">
+        <div className="flex items-center gap-8 flex-wrap">
+          <div className="flex items-center gap-7">
+            {[['Total', MOCK_EXHIBITS.length, '#14110D'], ['Uploaded', totalUploaded, '#1A7A40'], ['Missing', totalMissing, '#92400E']].map(([label, val, color]) => (
+              <div key={label}>
+                <div className="text-[10px] text-[#9A8573] uppercase tracking-wider mb-0.5">{label}</div>
+                <div className="text-[26px] font-bold leading-none" style={{ color }}>{val}</div>
+              </div>
+            ))}
+          </div>
+          <div className="max-w-40 flex-1">
+            <div className="flex justify-between text-[10px] text-[#9A8573] mb-1.5">
+              <span>Upload progress</span><span>{pct}%</span>
+            </div>
+            <div className="h-1.5 bg-[#E2E1DF] rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-600 rounded-full transition-all duration-500" style={{ width:`${pct}%` }}/>
+            </div>
+          </div>
+          {canEdit && (
+            <button onClick={() => setUploadTarget('new')}
+              className="ml-auto flex items-center gap-2 px-4 py-2 bg-[#14110D] text-white text-[13px] font-medium rounded-lg hover:bg-[#2C2316] transition-colors">
+              <Ic.upload size={13}/> Upload Exhibit
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: exhibit list */}
+        <div className={cls('flex flex-col overflow-hidden border-r border-[#E2E1DF] shrink-0', selected ? 'w-[340px]' : 'w-full')}>
+          {/* Filter bar */}
+          <div className="px-4 py-2.5 border-b border-[#E2E1DF] flex items-center gap-2 bg-[#F8F8F7] shrink-0">
+            {[['all','All'],['uploaded','Uploaded'],['missing','Missing docs']].map(([id, label]) => (
+              <button key={id} onClick={() => setFilter(id)}
+                className={cls('text-[12px] px-3 py-1 rounded-full border transition-colors',
+                  filter === id ? 'bg-[#14110D] text-white border-[#14110D]' : 'border-[#E2E1DF] text-[#6B5744] hover:border-[#9A8573]')}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Exhibit rows */}
+          <div className="flex-1 overflow-y-auto">
+            {exhibits.map(e => {
+              const s = statusOf(e);
+              const isSelected = selectedId === e.id;
+              return (
+                <button key={e.id} onClick={() => setSelectedId(isSelected ? null : e.id)}
+                  className={cls('w-full text-left border-b border-[#E2E1DF] flex items-stretch transition-colors',
+                    isSelected ? 'bg-[#EDEAE5]' : 'hover:bg-[#F4F2EE]')}>
+                  {/* Status stripe */}
+                  <div className="w-[3px] shrink-0 my-3 rounded-r"
+                    style={{ background: s === 'uploaded' ? '#1A7A40' : '#D97706' }}/>
+                  <div className="flex-1 min-w-0 px-4 py-3">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <span className="text-[10px] font-bold tracking-wider text-[#9A8573]">{e.label}</span>
+                      <span className={cls('text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border',
+                        s === 'uploaded' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
+                        {s === 'uploaded' ? '✓ Uploaded' : 'Missing doc'}
+                      </span>
+                    </div>
+                    <div className="text-[13px] font-semibold text-[#14110D] leading-snug mb-1.5">{e.name}</div>
+                    <div className="flex items-center gap-2 text-[11px] text-[#9A8573] flex-wrap">
+                      <span className="capitalize">{e.type}</span>
+                      {e.dateOfDoc && <><span>·</span><span>{e.dateOfDoc}</span></>}
+                      {e.pages && <><span>·</span><span>{e.pages}pp</span></>}
+                      {e.depoRefs.length > 0 && (
+                        <span className="ml-auto text-[10px] font-medium text-[#6B5744] shrink-0">
+                          {e.depoRefs.length} citation{e.depoRefs.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    {s === 'missing' && canEdit && (
+                      <button onClick={ev => { ev.stopPropagation(); setUploadTarget(e.id); }}
+                        className="mt-2 flex items-center gap-1 text-[11px] font-medium text-[#1D4E89] hover:text-[#14110D] transition-colors">
+                        <Ic.upload size={10}/> Upload document
+                      </button>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: detail panel or empty state */}
+        {selected ? (
+          <ExhibitDetailPanel
+            exhibit={selected}
+            status={statusOf(selected)}
+            canEdit={canEdit}
+            onUpload={() => setUploadTarget(selected.id)}
+            onClose={() => setSelectedId(null)}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-center p-8 bg-[#F8F8F7]">
+            <div>
+              <Ic.fileText size={36} className="mx-auto mb-3 text-[#D0C8BF]"/>
+              <p className="text-[14px] font-medium text-[#9A8573]">Select an exhibit</p>
+              <p className="text-[12px] text-[#C4B5A2] mt-1">View document, metadata, and case cross-references</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Upload modal */}
+      {uploadTarget && (
+        <UploadExhibitModal
+          exhibits={MOCK_EXHIBITS}
+          targetId={uploadTarget === 'new' ? null : uploadTarget}
+          onComplete={handleUploadComplete}
+          onClose={() => setUploadTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+
 function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
   const { user } = useAuth();
   const t = useToast();
@@ -2071,6 +2613,7 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
           <div className="flex items-center gap-1 bg-[#EDEAE5] rounded-lg p-1 shrink-0">
             {[
               { id:'depositions', label:'Depositions', icon: Ic.list },
+              { id:'exhibits',    label:'Exhibits',    icon: Ic.fileText },
               { id:'timeline',    label:'Timeline',    icon: Ic.calendar },
               { id:'map',         label:'Map',         icon: Ic.graph },
             ].map(({ id, label, icon: Icon }) => (
@@ -2092,8 +2635,9 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
           )}
         </div>
 
-        {caseTab === 'timeline' && <CaseLevelTimeline/>}
-        {caseTab === 'map'      && <CaseLevelMap/>}
+        {caseTab === 'exhibits'  && <CaseLevelExhibits/>}
+        {caseTab === 'timeline'  && <CaseLevelTimeline/>}
+        {caseTab === 'map'       && <CaseLevelMap/>}
 
         {caseTab === 'depositions' && <div className="flex-1 overflow-auto p-6">
           {view === 'grid' ? (
