@@ -2410,146 +2410,145 @@ function CaseLevelExhibits() {
   const { user } = useAuth();
   const toast = useToast();
   const canEdit = user?.role === 'admin' || user?.role === 'editor';
+  const [expanded, setExpanded] = useState(null);
   const [filter, setFilter] = useState('all');
-  const [selectedId, setSelectedId] = useState(null);
   const [uploadTarget, setUploadTarget] = useState(null);
-  // Track which exhibits have been uploaded this session (starts from mock data)
   const [uploadedSet, setUploadedSet] = useState(
     () => new Set(MOCK_EXHIBITS.filter(e => e.status === 'uploaded').map(e => e.id))
   );
 
   const statusOf = (e) => uploadedSet.has(e.id) ? 'uploaded' : 'missing';
 
-  const exhibits = MOCK_EXHIBITS.filter(e => {
-    const s = statusOf(e);
-    if (filter === 'uploaded') return s === 'uploaded';
-    if (filter === 'missing')  return s === 'missing';
-    return true;
-  });
+  const TYPE_COLORS = {
+    contract: { strip: '#F59E0B', pill: 'bg-amber-50 text-amber-700' },
+    calendar: { strip: '#3B82F6', pill: 'bg-blue-50 text-blue-700' },
+    document: { strip: '#8B5CF6', pill: 'bg-violet-50 text-violet-700' },
+    email:    { strip: '#10B981', pill: 'bg-emerald-50 text-emerald-700' },
+    record:   { strip: '#F43F5E', pill: 'bg-rose-50 text-rose-700' },
+  };
+  const typeColor = (t) => TYPE_COLORS[t] || { strip: '#C5BEB5', pill: 'bg-[#F0F0EE] text-[#6B5744]' };
 
   const totalUploaded = MOCK_EXHIBITS.filter(e => uploadedSet.has(e.id)).length;
-  const totalMissing  = MOCK_EXHIBITS.filter(e => !uploadedSet.has(e.id)).length;
   const pct = Math.round((totalUploaded / MOCK_EXHIBITS.length) * 100);
 
-  const selected = MOCK_EXHIBITS.find(e => e.id === selectedId);
+  const exhibits = MOCK_EXHIBITS.filter(e => {
+    if (filter === 'uploaded') return uploadedSet.has(e.id);
+    if (filter === 'missing')  return !uploadedSet.has(e.id);
+    return true;
+  });
 
   const handleUploadComplete = (exhibitId) => {
     setUploadedSet(prev => new Set([...prev, exhibitId]));
     setUploadTarget(null);
     const ex = MOCK_EXHIBITS.find(e => e.id === exhibitId);
     toast?.success('Upload confirmed', ex ? `${ex.label} — ${ex.name}` : 'Exhibit uploaded');
-    setSelectedId(exhibitId);
   };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Overview strip */}
-      <div className="px-6 py-4 border-b border-[#E2E1DF] bg-white shrink-0">
-        <div className="flex items-center gap-8 flex-wrap">
-          <div className="flex items-center gap-7">
-            {[['Total', MOCK_EXHIBITS.length, '#14110D'], ['Uploaded', totalUploaded, '#1A7A40'], ['Missing', totalMissing, '#92400E']].map(([label, val, color]) => (
-              <div key={label}>
-                <div className="text-[10px] text-[#9A8573] uppercase tracking-wider mb-0.5">{label}</div>
-                <div className="text-[26px] font-bold leading-none" style={{ color }}>{val}</div>
-              </div>
-            ))}
-          </div>
-          <div className="max-w-40 flex-1">
-            <div className="flex justify-between text-[10px] text-[#9A8573] mb-1.5">
-              <span>Upload progress</span><span>{pct}%</span>
+      {/* Stats + filter bar */}
+      <div className="px-6 py-3 border-b border-[#E2E1DF] bg-white shrink-0 flex items-center gap-6 flex-wrap">
+        <div className="flex items-center gap-6">
+          {[['Total', MOCK_EXHIBITS.length, '#14110D'], ['Uploaded', totalUploaded, '#1A7A40'], ['Missing', MOCK_EXHIBITS.length - totalUploaded, '#92400E']].map(([label, val, color]) => (
+            <div key={label}>
+              <div className="text-[9px] text-[#9A8573] uppercase tracking-wider mb-0.5">{label}</div>
+              <div className="text-xl font-bold leading-none" style={{ color }}>{val}</div>
             </div>
-            <div className="h-1.5 bg-[#E2E1DF] rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-600 rounded-full transition-all duration-500" style={{ width:`${pct}%` }}/>
+          ))}
+          <div className="w-24">
+            <div className="flex justify-between text-[9px] text-[#9A8573] mb-1"><span>Progress</span><span>{pct}%</span></div>
+            <div className="h-1 bg-[#E2E1DF] rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-600 rounded-full transition-all" style={{ width:`${pct}%` }}/>
             </div>
           </div>
+        </div>
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
+          {[['all','All'],['uploaded','Uploaded'],['missing','Missing']].map(([id, label]) => (
+            <button key={id} onClick={() => setFilter(id)}
+              className={cls('text-[11px] px-3 py-1 rounded-full border transition-colors',
+                filter === id ? 'bg-[#14110D] text-white border-[#14110D]' : 'border-[#E2E1DF] text-[#6B5744] hover:border-[#9A8573]')}>
+              {label}
+            </button>
+          ))}
           {canEdit && (
             <button onClick={() => setUploadTarget('new')}
-              className="ml-auto flex items-center gap-2 px-4 py-2 bg-[#14110D] text-white text-[13px] font-medium rounded-lg hover:bg-[#2C2316] transition-colors">
-              <Ic.upload size={13}/> Upload Exhibit
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#14110D] text-white text-[12px] font-medium rounded-lg hover:bg-[#2C2316] transition-colors">
+              <Ic.upload size={12}/> Upload
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: exhibit list */}
-        <div className={cls('flex flex-col overflow-hidden border-r border-[#E2E1DF] shrink-0', selected ? 'w-[340px]' : 'w-full')}>
-          {/* Filter bar */}
-          <div className="px-4 py-2.5 border-b border-[#E2E1DF] flex items-center gap-2 bg-[#F8F8F7] shrink-0">
-            {[['all','All'],['uploaded','Uploaded'],['missing','Missing docs']].map(([id, label]) => (
-              <button key={id} onClick={() => setFilter(id)}
-                className={cls('text-[12px] px-3 py-1 rounded-full border transition-colors',
-                  filter === id ? 'bg-[#14110D] text-white border-[#14110D]' : 'border-[#E2E1DF] text-[#6B5744] hover:border-[#9A8573]')}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Exhibit rows */}
-          <div className="flex-1 overflow-y-auto">
-            {exhibits.map(e => {
-              const s = statusOf(e);
-              const isSelected = selectedId === e.id;
-              return (
-                <button key={e.id} onClick={() => setSelectedId(isSelected ? null : e.id)}
-                  className={cls('w-full text-left border-b border-[#E2E1DF] flex items-stretch transition-colors',
-                    isSelected ? 'bg-[#EDEAE5]' : 'hover:bg-[#F4F2EE]')}>
-                  {/* Status stripe */}
-                  <div className="w-[3px] shrink-0 my-3 rounded-r"
-                    style={{ background: s === 'uploaded' ? '#1A7A40' : '#D97706' }}/>
-                  <div className="flex-1 min-w-0 px-4 py-3">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span className="text-[10px] font-bold tracking-wider text-[#9A8573]">{e.label}</span>
+      {/* Exhibit cards — same pattern as deposition-level ExhibitsTab */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-2">
+        {exhibits.map(e => {
+          const isOpen = expanded === e.id;
+          const s = statusOf(e);
+          const tc = typeColor(e.type);
+          return (
+            <div key={e.id} className="bg-white rounded-xl border border-[#E2E1DF] overflow-hidden flex">
+              <div className="w-1 shrink-0" style={{ background: s === 'missing' ? '#D97706' : tc.strip }}/>
+              <div className="flex-1 min-w-0">
+                <div onClick={() => setExpanded(isOpen ? null : e.id)}
+                  className="px-4 py-3 hover:bg-[#F0F0EE] transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[10px] font-mono font-bold text-[#9A8573] bg-[#F0F0EE] rounded-full px-2 py-0.5 whitespace-nowrap">{e.label}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <span className={cls('text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border',
                         s === 'uploaded' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
                         {s === 'uploaded' ? '✓ Uploaded' : 'Missing doc'}
                       </span>
-                    </div>
-                    <div className="text-[13px] font-semibold text-[#14110D] leading-snug mb-1.5">{e.name}</div>
-                    <div className="flex items-center gap-2 text-[11px] text-[#9A8573] flex-wrap">
-                      <span className="capitalize">{e.type}</span>
-                      {e.dateOfDoc && <><span>·</span><span>{e.dateOfDoc}</span></>}
-                      {e.pages && <><span>·</span><span>{e.pages}pp</span></>}
-                      {e.depoRefs.length > 0 && (
-                        <span className="ml-auto text-[10px] font-medium text-[#6B5744] shrink-0">
-                          {e.depoRefs.length} citation{e.depoRefs.length > 1 ? 's' : ''}
-                        </span>
+                      {canEdit && s === 'missing' && (
+                        <button onClick={ev => { ev.stopPropagation(); setUploadTarget(e.id); }}
+                          className="text-[9px] font-medium text-[#6B5744] hover:text-[#14110D] bg-[#F0F0EE] hover:bg-[#E2E1DF] rounded-full px-2 py-0.5 transition-colors whitespace-nowrap">
+                          Upload
+                        </button>
                       )}
+                      {isOpen ? <Ic.chevU size={12}/> : <Ic.chevD size={12}/>}
                     </div>
-                    {s === 'missing' && canEdit && (
-                      <button onClick={ev => { ev.stopPropagation(); setUploadTarget(e.id); }}
-                        className="mt-2 flex items-center gap-1 text-[11px] font-medium text-[#1D4E89] hover:text-[#14110D] transition-colors">
-                        <Ic.upload size={10}/> Upload document
-                      </button>
+                  </div>
+                  <div className="text-[13px] font-semibold text-[#14110D] leading-snug mb-1">{e.name}</div>
+                  <p className="text-[11px] text-[#6B5744] leading-relaxed mb-2 line-clamp-2">{e.description}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={cls('text-[9px] font-medium rounded-full px-2 py-0.5 capitalize', tc.pill)}>{e.type}</span>
+                    {e.pages && <span className="text-[10px] text-[#9A8573]">{e.pages}pp</span>}
+                    <span className="text-[10px] text-[#9A8573] ml-auto">{e.depoRefs.length} deposition ref{e.depoRefs.length !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+
+                {/* Expanded: deposition references */}
+                {isOpen && (
+                  <div className="border-t border-[#F0F0EE] px-4 py-3 bg-[#F8F8F7]">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#9A8573] mb-2">Deposition References</p>
+                    {e.depoRefs.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {e.depoRefs.map((r, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <span className="text-[9px] font-mono text-[#9A8573] bg-[#F0F0EE] rounded-full px-2 py-0.5 whitespace-nowrap shrink-0">
+                              {r.witness} · p.{r.page} l.{r.line}
+                            </span>
+                            <span className="text-[11px] text-[#6B5744] leading-relaxed">{r.context}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-[#9A8573]">No deposition references</p>
+                    )}
+                    {(e.bates || e.producedBy) && (
+                      <div className="mt-2 pt-2 border-t border-[#E2E1DF] flex items-center gap-3 text-[9px] text-[#9A8573] flex-wrap">
+                        {e.bates && <span>Bates: <span className="font-mono">{e.bates}</span></span>}
+                        {e.pages && <span>{e.pages} pages</span>}
+                        {e.producedBy && <span>Produced by: {e.producedBy}</span>}
+                      </div>
                     )}
                   </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: detail panel or empty state */}
-        {selected ? (
-          <ExhibitDetailPanel
-            exhibit={selected}
-            status={statusOf(selected)}
-            canEdit={canEdit}
-            onUpload={() => setUploadTarget(selected.id)}
-            onClose={() => setSelectedId(null)}
-          />
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-center p-8 bg-[#F8F8F7]">
-            <div>
-              <Ic.fileText size={36} className="mx-auto mb-3 text-[#D0C8BF]"/>
-              <p className="text-[14px] font-medium text-[#9A8573]">Select an exhibit</p>
-              <p className="text-[12px] text-[#C4B5A2] mt-1">View document, metadata, and case cross-references</p>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })}
       </div>
 
-      {/* Upload modal */}
       {uploadTarget && (
         <UploadExhibitModal
           exhibits={MOCK_EXHIBITS}
@@ -2569,6 +2568,7 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
   const canEdit = user?.role === 'admin' || user?.role === 'editor';
   const [view, setView] = useState('grid');
   const [caseTab, setCaseTab] = useState('depositions');
+  const [depoSubTab, setDepoSubTab] = useState('list');
   const selectedCase = MOCK_CASES.find((c) => c.id === caseId);
   const baseList = selectedCase ? MOCK_DEPOSITIONS.filter((d) => d.caseNumber === selectedCase.caseNumber) : MOCK_DEPOSITIONS;
   const [depos, setDepos] = useState(baseList);
@@ -2613,7 +2613,6 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
           <div className="flex items-center gap-1 bg-[#EDEAE5] rounded-lg p-1 shrink-0">
             {[
               { id:'depositions', label:'Depositions', icon: Ic.list },
-              { id:'exhibits',    label:'Exhibits',    icon: Ic.fileText },
               { id:'timeline',    label:'Timeline',    icon: Ic.calendar },
               { id:'map',         label:'Map',         icon: Ic.graph },
             ].map(({ id, label, icon: Icon }) => (
@@ -2624,7 +2623,7 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
               </button>
             ))}
           </div>
-          {caseTab === 'depositions' && (
+          {caseTab === 'depositions' && depoSubTab === 'list' && (
             <div className="flex items-center gap-2 shrink-0">
               <div className="flex items-center gap-1 border border-[#E2E1DF] rounded-lg p-1 bg-[#F8F8F7]">
                 <Button variant={view === 'list' ? 'secondary' : 'ghost'} size="sm" onClick={() => setView('list')} className="h-9 w-9 p-0"><Ic.list size={18}/></Button>
@@ -2635,11 +2634,22 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
           )}
         </div>
 
-        {caseTab === 'exhibits'  && <CaseLevelExhibits/>}
         {caseTab === 'timeline'  && <CaseLevelTimeline/>}
         {caseTab === 'map'       && <CaseLevelMap/>}
 
-        {caseTab === 'depositions' && <div className="flex-1 overflow-auto p-6">
+        {caseTab === 'depositions' && <>
+          {/* Depositions sub-nav */}
+          <div className="border-b border-[#E2E1DF] bg-white px-6 flex items-center shrink-0">
+            {[['list','Depositions'],['exhibits','All Exhibits']].map(([id, label]) => (
+              <button key={id} onClick={() => setDepoSubTab(id)}
+                className={cls('text-[13px] px-4 py-2.5 border-b-2 transition-colors -mb-px font-medium',
+                  depoSubTab === id ? 'border-[#14110D] text-[#14110D]' : 'border-transparent text-[#6B5744] hover:text-[#14110D]')}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {depoSubTab === 'exhibits' && <CaseLevelExhibits/>}
+          {depoSubTab === 'list' && <div className="flex-1 overflow-auto p-6">
           {view === 'grid' ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {list.map((d) => (
@@ -2707,7 +2717,8 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
               ))}
             </div>
           )}
-        </div>}
+          </div>}
+        </>}
       </div>
       {caseTab === 'depositions' && <CaseChatPanel selectedCase={selectedCase}/>}
       {editDepo && (
@@ -4084,10 +4095,15 @@ function DepoSummaryBlock() {
 // ---------- Exhibits Tab ----------
 function ExhibitsTab({ jump }) {
   const exhibits = MOCK_DETAIL.exhibits || [];
-  const contradictionCount = exhibits.reduce((s, e) => s + e.contradictions, 0);
   const fmt = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
   const [expanded, setExpanded] = useState(null);
+  const [uploadTarget, setUploadTarget] = useState(null);
+  const [uploadedSet, setUploadedSet] = useState(() => new Set(['exh-001','exh-002','exh-003']));
   const { getRecord } = useVerifyCtx();
+  const { user } = useAuth();
+  const toast = useToast();
+  const canEdit = user?.role === 'admin' || user?.role === 'editor';
+  const statusOf = (id) => uploadedSet.has(id) ? 'uploaded' : 'missing';
 
   const CAT = {
     Contract: { pill: 'bg-amber-50 text-amber-700',     strip: '#F59E0B' },
@@ -4125,6 +4141,7 @@ function ExhibitsTab({ jump }) {
   };
 
   return (
+    <>
     <div className="flex flex-col gap-2">
       {exhibits.map((e) => {
         const isOpen = expanded === e.id;
@@ -4134,7 +4151,7 @@ function ExhibitsTab({ jump }) {
         const displayDesc = erec?.fixes?.slice(-1)[0]?.fixed || e.desc;
         return (
           <div key={e.id} className="bg-white rounded-xl border border-[#E2E1DF] overflow-hidden flex">
-            <div className="w-1 shrink-0" style={{ background: cat(e).strip }}/>
+            <div className="w-1 shrink-0" style={{ background: statusOf(e.id) === 'missing' ? '#D97706' : cat(e).strip }}/>
             <div className="flex-1 min-w-0">
               {/* Main row — click to expand */}
               <div onClick={() => setExpanded(isOpen ? null : e.id)}
@@ -4142,6 +4159,16 @@ function ExhibitsTab({ jump }) {
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-[10px] font-mono font-bold text-[#9A8573] bg-[#F0F0EE] rounded-full px-2 py-0.5 whitespace-nowrap">{e.label}</span>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={cls('text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border',
+                      statusOf(e.id) === 'uploaded' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
+                      {statusOf(e.id) === 'uploaded' ? '✓ Uploaded' : 'Missing doc'}
+                    </span>
+                    {canEdit && statusOf(e.id) === 'missing' && (
+                      <button onClick={ev => { ev.stopPropagation(); setUploadTarget(e.id); }}
+                        className="text-[9px] font-medium text-[#6B5744] hover:text-[#14110D] bg-[#F0F0EE] hover:bg-[#E2E1DF] rounded-full px-2 py-0.5 transition-colors">
+                        Upload
+                      </button>
+                    )}
                     {e.contradictions > 0 && (
                       <span className="inline-flex items-center gap-1 text-[9px] text-rose-600 bg-rose-50 rounded-full px-1.5 py-0.5">
                         <Ic.alert size={8}/> {e.contradictions} conflict{e.contradictions > 1 ? 's' : ''}
@@ -4180,6 +4207,15 @@ function ExhibitsTab({ jump }) {
         );
       })}
     </div>
+    {uploadTarget && (
+      <UploadExhibitModal
+        exhibits={MOCK_EXHIBITS}
+        targetId={uploadTarget === 'new' ? null : uploadTarget}
+        onComplete={(id) => { setUploadedSet(prev => new Set([...prev, id])); setUploadTarget(null); toast?.success('Document uploaded'); }}
+        onClose={() => setUploadTarget(null)}
+      />
+    )}
+    </>
   );
 }
 
