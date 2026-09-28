@@ -1407,6 +1407,237 @@ const CASE_WORKFLOWS = [
   { icon: <Ic.fileText size={15}/>, title: 'Draft case timeline',               desc: 'Chronological narrative built from all testimony' },
 ];
 
+// ---------- Case Panel Exhibits ----------
+function CasePanelExhibits() {
+  const [exhibits, setExhibits] = useState(() => MOCK_EXHIBITS);
+  const [expanded, setExpanded] = useState(null);
+  const [editExhibit, setEditExhibit] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [uploadedSet, setUploadedSet] = useState(() => new Set(MOCK_EXHIBITS.filter(e => e.status === 'uploaded').map(e => e.id)));
+  const [uploadTarget, setUploadTarget] = useState(null);
+  const toast = useToast();
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'editor';
+  const statusOf = (id) => uploadedSet.has(id) ? 'uploaded' : 'missing';
+
+  const TYPE_STYLE = {
+    contract: { pill: 'bg-amber-50 text-amber-700',     strip: '#F59E0B' },
+    calendar: { pill: 'bg-blue-50 text-blue-700',       strip: '#3B82F6' },
+    record:   { pill: 'bg-violet-50 text-violet-700',   strip: '#8B5CF6' },
+    email:    { pill: 'bg-emerald-50 text-emerald-700', strip: '#10B981' },
+    document: { pill: 'bg-rose-50 text-rose-700',       strip: '#F43F5E' },
+  };
+  const typeStyle = (e) => TYPE_STYLE[e.type] || { pill: 'bg-[#F0F0EE] text-[#6B5744]', strip: '#C5BEB5' };
+
+  const WITNESS_COLORS = {
+    'depo-001': { bg: '#FFF5F5', color: '#7A2E20', border: '#FECACA' },
+    'depo-007': { bg: '#EFF6FF', color: '#1D4E89', border: '#BFDBFE' },
+    'depo-008': { bg: '#F0FDF4', color: '#3D6B2E', border: '#BBF7D0' },
+  };
+
+  const handleDelete = (exhibit) => {
+    setExhibits(es => es.filter(e => e.id !== exhibit.id));
+    setDeleteConfirm(null);
+    if (expanded === exhibit.id) setExpanded(null);
+    toast?.success('Exhibit removed', exhibit.label);
+  };
+
+  const handleSaveEdit = (updated) => {
+    setExhibits(es => es.map(e => e.id === updated.id ? { ...e, name: updated.title, description: updated.desc, bates: updated.bates, pages: updated.pages, producedBy: updated.producedBy, dateOfDoc: updated.dateOfDoc, tags: updated.tags } : e));
+    setEditExhibit(null);
+    toast?.success('Metadata updated', updated.label || updated.title);
+  };
+
+  const uploaded = exhibits.filter(e => statusOf(e.id) === 'uploaded').length;
+
+  return (
+    <div className="flex-1 overflow-y-auto min-h-0">
+      {/* Stats strip */}
+      <div className="px-4 py-3 border-b border-[#E2E1DF] bg-white shrink-0 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-[#14110D] font-medium">{exhibits.length} exhibits</span>
+          <span className="text-[10px] text-[#9A8573]">{uploaded} uploaded · {exhibits.length - uploaded} missing</span>
+        </div>
+        {canEdit && (
+          <button onClick={() => setUploadTarget('new')}
+            className="flex items-center gap-1.5 text-[11px] font-medium text-[#14110D] border border-[#E2E1DF] rounded-lg px-2.5 py-1.5 hover:bg-[#F0F0EE] transition-colors">
+            <Ic.upload size={11}/> Upload
+          </button>
+        )}
+      </div>
+
+      {/* Exhibit cards */}
+      <div className="flex flex-col gap-2 p-3">
+        {exhibits.map((e) => {
+          const isOpen = expanded === e.id;
+          const s = statusOf(e.id);
+          const ts = typeStyle(e);
+          const menuItems = [
+            { label: 'View Document',    icon: Ic.eye,   onClick: () => setExpanded(e.id) },
+            { label: 'Edit Metadata',    icon: Ic.edit,  onClick: () => setEditExhibit(e) },
+            { label: 'Manage Links',     icon: Ic.graph, onClick: () => toast?.success('Deposition links', `${(e.depoRefs||[]).length} linked`) },
+            ...(canEdit ? [
+              'divider',
+              s === 'missing' ? { label: 'Upload Document', icon: Ic.upload, onClick: () => setUploadTarget(e.id) } : null,
+              { label: 'Delete',         icon: Ic.x,     danger: true, onClick: () => setDeleteConfirm(e) },
+            ].filter(Boolean) : []),
+          ];
+
+          return (
+            <div key={e.id} className="bg-white rounded-xl border border-[#E2E1DF] overflow-hidden flex">
+              <div className="w-1 shrink-0" style={{ background: s === 'missing' ? '#D97706' : ts.strip }}/>
+              <div className="flex-1 min-w-0">
+                {/* Summary row */}
+                <div className="px-3 py-3">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[10px] font-mono font-bold text-[#9A8573] bg-[#F0F0EE] rounded-full px-2 py-0.5 whitespace-nowrap">{e.label}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={cls('text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border',
+                        s === 'uploaded' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
+                        {s === 'uploaded' ? '✓ Uploaded' : 'Missing doc'}
+                      </span>
+                      <ThreeDotMenu items={menuItems}/>
+                      <button onClick={() => setExpanded(isOpen ? null : e.id)} className="text-[#9A8573] hover:text-[#14110D] transition-colors">
+                        {isOpen ? <Ic.chevU size={12}/> : <Ic.chevD size={12}/>}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-[13px] font-semibold text-[#14110D] leading-snug mb-1 cursor-pointer"
+                    onClick={() => setExpanded(isOpen ? null : e.id)}>{e.name}</div>
+                  <p className="text-[11px] text-[#6B5744] leading-relaxed mb-2 line-clamp-2">{e.description}</p>
+
+                  {/* Deposition link pills — always visible */}
+                  {(e.depoRefs || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {[...new Map((e.depoRefs || []).map(r => [r.depoId, r])).values()].map(r => {
+                        const wc = WITNESS_COLORS[r.depoId] || { bg: '#F0F0EE', color: '#6B5744', border: '#E2E1DF' };
+                        return (
+                          <span key={r.depoId}
+                            className="text-[9px] font-medium rounded-full px-2 py-0.5 border"
+                            style={{ background: wc.bg, color: wc.color, borderColor: wc.border }}>
+                            {r.witness}
+                          </span>
+                        );
+                      })}
+                      <span className={cls('text-[9px] font-medium rounded-full px-1.5 py-0.5', ts.pill)}>{e.type}</span>
+                    </div>
+                  )}
+                  {(e.tags || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(e.tags || []).slice(0,3).map(tag => (
+                        <span key={tag} className="text-[9px] text-[#9A8573] bg-[#F0F0EE] rounded-full px-1.5 py-0.5">{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Expanded detail */}
+                {isOpen && (
+                  <div className="border-t border-[#F0F0EE] bg-[#F8F8F7]">
+                    {/* Document viewer zone */}
+                    <div className="px-3 py-3 border-b border-[#F0F0EE]">
+                      {s === 'uploaded' ? (
+                        <div className="h-24 bg-white rounded-lg border border-[#E2E1DF] flex items-center justify-center gap-3 cursor-pointer hover:border-[#9A8573] transition-colors group">
+                          <Ic.fileText size={20} className="text-[#C4B5A2] group-hover:text-[#9A8573] transition-colors"/>
+                          <div>
+                            <p className="text-[12px] font-medium text-[#9A8573]">{e.name}</p>
+                            <p className="text-[10px] text-[#C4B5A2]">{e.pages ? `${e.pages} pages` : ''}{e.pages && e.bates ? ' · ' : ''}{e.bates || ''}</p>
+                            <p className="text-[10px] text-[#7A2E20] mt-1">Open document viewer →</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={cls('h-20 rounded-lg border flex items-center justify-center gap-3',
+                          canEdit ? 'bg-amber-50 border-amber-200' : 'bg-[#F0F0EE] border-[#E2E1DF]')}>
+                          <Ic.upload size={16} className={canEdit ? 'text-amber-600' : 'text-[#C4B5A2]'}/>
+                          <div>
+                            <p className={cls('text-[12px] font-medium', canEdit ? 'text-amber-700' : 'text-[#9A8573]')}>Document not yet uploaded</p>
+                            {canEdit && <button onClick={() => setUploadTarget(e.id)} className="text-[10px] text-amber-700 underline">Upload now</button>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="px-3 py-3 border-b border-[#F0F0EE]">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#9A8573]">Metadata</p>
+                        {canEdit && <button onClick={() => setEditExhibit(e)} className="text-[9px] text-[#7A2E20] hover:underline flex items-center gap-1"><Ic.edit size={9}/> Edit</button>}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                        {e.bates      && <div className="col-span-2 flex gap-1.5"><span className="text-[9px] text-[#9A8573] shrink-0">Bates:</span><span className="text-[9px] font-mono text-[#14110D]">{e.bates}</span></div>}
+                        {e.pages      && <div className="flex gap-1.5"><span className="text-[9px] text-[#9A8573]">Pages:</span><span className="text-[9px] text-[#14110D]">{e.pages}</span></div>}
+                        {e.dateOfDoc  && <div className="flex gap-1.5"><span className="text-[9px] text-[#9A8573]">Date:</span><span className="text-[9px] text-[#14110D]">{e.dateOfDoc}</span></div>}
+                        {e.producedBy && <div className="col-span-2 flex gap-1.5"><span className="text-[9px] text-[#9A8573] shrink-0">Produced by:</span><span className="text-[9px] text-[#14110D]">{e.producedBy}</span></div>}
+                      </div>
+                      {(e.tags || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {(e.tags || []).map(tag => <span key={tag} className="text-[9px] bg-[#F0F0EE] text-[#6B5744] rounded-full px-2 py-0.5">{tag}</span>)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Linked depositions */}
+                    {(e.depoRefs || []).length > 0 && (
+                      <div className="px-3 py-3">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#9A8573] mb-2">Linked Depositions</p>
+                        <div className="flex flex-col gap-2">
+                          {e.depoRefs.map((r, i) => {
+                            const wc = WITNESS_COLORS[r.depoId] || { bg: '#F0F0EE', color: '#6B5744', border: '#E2E1DF' };
+                            return (
+                              <div key={i} className="rounded-lg border p-2.5" style={{ background: wc.bg, borderColor: wc.border }}>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <span className="text-[10px] font-semibold" style={{ color: wc.color }}>{r.witness}</span>
+                                  <span className="text-[9px] font-mono text-[#9A8573]">p.{r.page} l.{r.line}</span>
+                                </div>
+                                <p className="text-[10px] text-[#4A3828] leading-relaxed italic">"{r.context}"</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Delete confirm */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-[15px] font-semibold mb-2 text-[#14110D]">Remove exhibit?</h3>
+            <p className="text-[13px] text-[#6B5744] mb-4"><span className="font-medium">{deleteConfirm.label}</span> — {deleteConfirm.name} will be removed from this case.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 text-[13px] font-medium border border-[#E2E1DF] rounded-lg hover:bg-[#F0F0EE] transition-colors">Cancel</button>
+              <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-2 text-[13px] font-medium bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors">Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editExhibit && (
+        <ExhibitEditModal
+          exhibit={{ ...editExhibit, title: editExhibit.name, desc: editExhibit.description }}
+          onSave={handleSaveEdit}
+          onClose={() => setEditExhibit(null)}
+        />
+      )}
+
+      {uploadTarget && (
+        <UploadExhibitModal
+          exhibits={MOCK_EXHIBITS}
+          targetId={uploadTarget === 'new' ? null : uploadTarget}
+          onComplete={(id) => { setUploadedSet(prev => new Set([...prev, id])); setUploadTarget(null); toast?.success('Document uploaded'); }}
+          onClose={() => setUploadTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 function CaseChatPanel({ selectedCase }) {
   const [sessions, setSessions] = useState([{ id: 's0', title: 'New chat', messages: [] }]);
   const [activeId, setActiveId] = useState('s0');
@@ -1417,6 +1648,7 @@ function CaseChatPanel({ selectedCase }) {
   const [workingExpanded, setWorkingExpanded] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedDepos, setSelectedDepos] = useState([]);
+  const [panelTab, setPanelTab] = useState('chat');
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -1475,19 +1707,33 @@ function CaseChatPanel({ selectedCase }) {
 
   return (
     <div className="w-[420px] shrink-0 border-l border-[#E2E1DF] flex flex-col bg-[#F8F8F7]">
-      {/* Chat header: title + history + new chat */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#E2E1DF] shrink-0">
-        <span className="flex-1 text-[12px] text-[#9A8573] truncate min-w-0">{active?.title || 'New chat'}</span>
-        <button onClick={() => setHistoryOpen(o => !o)} title="Chat history"
-          className={cls('w-7 h-7 flex items-center justify-center rounded-lg transition-colors', historyOpen ? 'bg-[#14110D] text-white' : 'text-[#9A8573] hover:bg-[#E8E6E3]')}>
-          <Ic.clock size={13}/>
-        </button>
-        <button onClick={newChat} title="New chat"
-          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors">
-          <Ic.plus size={14}/>
-        </button>
+      {/* Panel header: tabs + actions */}
+      <div className="flex items-center border-b border-[#E2E1DF] shrink-0 px-1">
+        <div className="flex items-center flex-1">
+          {[['chat','Chat'],['exhibits','Exhibits']].map(([id, label]) => (
+            <button key={id} onClick={() => { setPanelTab(id); setHistoryOpen(false); }}
+              className={cls('text-[13px] px-3 py-2.5 border-b-2 transition-colors -mb-px font-medium',
+                panelTab === id ? 'border-[#14110D] text-[#14110D]' : 'border-transparent text-[#6B5744] hover:text-[#14110D]')}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {panelTab === 'chat' && (
+          <div className="flex items-center gap-0.5 pr-2">
+            <span className="text-[11px] text-[#9A8573] truncate max-w-[110px]">{active?.title || 'New chat'}</span>
+            <button onClick={() => setHistoryOpen(o => !o)} title="Chat history"
+              className={cls('w-7 h-7 flex items-center justify-center rounded-lg transition-colors', historyOpen ? 'bg-[#14110D] text-white' : 'text-[#9A8573] hover:bg-[#E8E6E3]')}>
+              <Ic.clock size={13}/>
+            </button>
+            <button onClick={newChat} title="New chat"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9A8573] hover:bg-[#E8E6E3] transition-colors">
+              <Ic.plus size={14}/>
+            </button>
+          </div>
+        )}
       </div>
 
+      {panelTab === 'exhibits' ? <CasePanelExhibits/> : <>
       {/* History panel */}
       {historyOpen && (
         <div className="border-b border-[#E2E1DF] max-h-52 overflow-y-auto shrink-0 bg-[#F8F8F7]">
@@ -1595,6 +1841,7 @@ function CaseChatPanel({ selectedCase }) {
           </div>
         </div>
       </div>
+      </>}
     </div>
   );
 }
@@ -2649,7 +2896,6 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
   const canEdit = user?.role === 'admin' || user?.role === 'editor';
   const [view, setView] = useState('grid');
   const [caseTab, setCaseTab] = useState('depositions');
-  const [depoSubTab, setDepoSubTab] = useState('list');
   const [caseUploadOpen, setCaseUploadOpen] = useState(false);
   const [caseExhibitUpload, setCaseExhibitUpload] = useState(false);
   const selectedCase = MOCK_CASES.find((c) => c.id === caseId);
@@ -2737,19 +2983,7 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
         {caseTab === 'timeline'  && <CaseLevelTimeline/>}
         {caseTab === 'map'       && <CaseLevelMap/>}
 
-        {caseTab === 'depositions' && <>
-          {/* Depositions sub-nav */}
-          <div className="border-b border-[#E2E1DF] bg-white px-6 flex items-center shrink-0">
-            {[['list','Depositions'],['exhibits','All Exhibits']].map(([id, label]) => (
-              <button key={id} onClick={() => setDepoSubTab(id)}
-                className={cls('text-[13px] px-4 py-2.5 border-b-2 transition-colors -mb-px font-medium',
-                  depoSubTab === id ? 'border-[#14110D] text-[#14110D]' : 'border-transparent text-[#6B5744] hover:text-[#14110D]')}>
-                {label}
-              </button>
-            ))}
-          </div>
-          {depoSubTab === 'exhibits' && <CaseLevelExhibits/>}
-          {depoSubTab === 'list' && <div className="flex-1 overflow-auto p-6">
+        {caseTab === 'depositions' && <div className="flex-1 overflow-auto p-6">
           {view === 'grid' ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {list.map((d) => (
@@ -2818,7 +3052,6 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
             </div>
           )}
           </div>}
-        </>}
       </div>
       {caseTab === 'depositions' && <CaseChatPanel selectedCase={selectedCase}/>}
       {editDepo && (
