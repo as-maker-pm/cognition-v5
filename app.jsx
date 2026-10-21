@@ -2952,7 +2952,7 @@ function DepositionLibrary({ caseId, onSelect, onBack, onAdd }) {
               </button>
             ))}
           </div>
-          {caseTab === 'depositions' && depoSubTab === 'list' && (
+          {caseTab === 'depositions' && (
             <div className="flex items-center gap-2 shrink-0">
               <div className="flex items-center gap-1 border border-[#E2E1DF] rounded-lg p-1 bg-[#F8F8F7]">
                 <Button variant={view === 'list' ? 'secondary' : 'ghost'} size="sm" onClick={() => setView('list')} className="h-9 w-9 p-0"><Ic.list size={18}/></Button>
